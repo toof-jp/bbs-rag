@@ -1,4 +1,6 @@
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,7 +10,7 @@ from app.core.config import settings
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # スタートアップ時の処理
     print("Starting up BBS RAG API...")
     yield
@@ -34,7 +36,7 @@ app.add_middleware(
 
 # ルートエンドポイント
 @app.get("/")
-def read_root():
+def read_root() -> Dict[str, str]:
     return {"message": "Welcome to BBS RAG API", "docs": "/docs"}
 
 

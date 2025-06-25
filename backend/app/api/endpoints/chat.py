@@ -1,5 +1,6 @@
 import json
 from collections.abc import AsyncIterator
+from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
@@ -83,7 +84,7 @@ async def generate_sse_events(question: str) -> AsyncIterator[str]:
 
 
 @router.post("/ask")
-async def ask_question_endpoint(request: AskRequest):
+async def ask_question_endpoint(request: AskRequest) -> EventSourceResponse:
     """
     掲示板の内容に関する質問を受け付け、ストリーミングで回答を返す
 
@@ -108,7 +109,7 @@ async def ask_question_endpoint(request: AskRequest):
 
 
 @router.post("/ask/sync")
-async def ask_question_sync(request: AskRequest):
+async def ask_question_sync(request: AskRequest) -> Dict[str, str]:
     """
     非ストリーミング版の質問応答エンドポイント（デバッグ用）
     """
@@ -120,6 +121,6 @@ async def ask_question_sync(request: AskRequest):
 
 
 @router.get("/health")
-async def health_check():
+async def health_check() -> Dict[str, str]:
     """ヘルスチェックエンドポイント"""
     return {"status": "healthy", "service": "chat"}

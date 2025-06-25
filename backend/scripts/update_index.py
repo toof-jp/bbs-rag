@@ -19,6 +19,9 @@ from tqdm import tqdm
 # プロジェクトのルートディレクトリをPythonパスに追加
 sys.path.append(str(Path(__file__).parent.parent))
 
+from collections.abc import Iterator
+from typing import Any, Dict
+
 from langchain_core.documents import Document
 from sqlalchemy import func
 
@@ -32,15 +35,16 @@ from app.rag.retriever import get_parent_document_retriever, get_vector_store
 METADATA_FILE = os.path.join(os.path.dirname(__file__), "../index_metadata.json")
 
 
-def load_metadata():
+def load_metadata() -> Dict[str, Any]:
     """インデックスのメタデータを読み込む"""
     if os.path.exists(METADATA_FILE):
         with open(METADATA_FILE) as f:
-            return json.load(f)
+            data: Dict[str, Any] = json.load(f)
+            return data
     return {"last_processed_no": 0, "last_update": None}
 
 
-def save_metadata(metadata):
+def save_metadata(metadata: Dict[str, Any]) -> None:
     """インデックスのメタデータを保存"""
     metadata["last_update"] = datetime.now().isoformat()
     with open(METADATA_FILE, "w") as f:
@@ -54,7 +58,7 @@ class IncrementalPostgresResLoader(PostgresResLoader):
         super().__init__(batch_size)
         self.start_no = start_no
 
-    def lazy_load(self):
+    def lazy_load(self) -> Iterator[Document]:
         """指定されたレス番号以降のデータを読み込む"""
         db = SessionLocal()
         try:
@@ -94,7 +98,7 @@ class IncrementalPostgresResLoader(PostgresResLoader):
 
                     yield Document(page_content=content, metadata=metadata)
 
-                last_no = res_list[-1].no
+                last_no = int(res_list[-1].no)
         finally:
             db.close()
 
@@ -108,7 +112,7 @@ class IncrementalThreadAwareLoader(ThreadAwareLoader):
         # 境界付近の再構築のため、少し前から開始
         self.rebuild_start = max(0, start_no - window_size)
 
-    def lazy_load(self):
+    def lazy_load(self) -> Iterator[Document]:
         """新しいレスを含むウィンドウを生成"""
         # ベースローダーを差分用に変更
         self.base_loader = IncrementalPostgresResLoader(self.rebuild_start)
@@ -117,7 +121,7 @@ class IncrementalThreadAwareLoader(ThreadAwareLoader):
         yield from super().lazy_load()
 
 
-async def update_index():
+async def update_index() -> None:
     """インデックスを差分更新"""
     print("Starting incremental index update...")
 
@@ -206,7 +210,7 @@ async def update_index():
     print(f"- Last update: {metadata['last_update']}")
 
 
-def main():
+def main() -> None:
     """メイン関数"""
     # 環境変数の確認
     if not settings.OPENAI_API_KEY:

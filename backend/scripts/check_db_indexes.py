@@ -13,7 +13,7 @@ from sqlalchemy import text
 from app.core.database import engine
 
 
-def check_indexes():
+def check_indexes() -> None:
     """データベースのインデックスを確認"""
     with engine.connect() as conn:
         # resテーブルのインデックスを確認

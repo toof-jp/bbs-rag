@@ -59,7 +59,7 @@ class PostgresResLoader(BaseLoader):
                     yield Document(page_content=content, metadata=metadata)
 
                 # 最後のレス番号を更新
-                last_no = res_list[-1].no
+                last_no = int(res_list[-1].no)
         except Exception as e:
             print(f"Error in PostgresResLoader: {e}")
             raise

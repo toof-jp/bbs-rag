@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from langchain.retrievers import ParentDocumentRetriever
 from langchain.storage import LocalFileStore
@@ -6,18 +7,19 @@ from langchain.storage._lc_store import create_kv_docstore
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pydantic import SecretStr
 
 from app.core.config import settings
 
 
-def get_embeddings():
+def get_embeddings() -> OpenAIEmbeddings:
     """埋め込みモデルのインスタンスを取得"""
     return OpenAIEmbeddings(
-        model=settings.OPENAI_EMBEDDING_MODEL, openai_api_key=settings.OPENAI_API_KEY
+        model=settings.OPENAI_EMBEDDING_MODEL, api_key=SecretStr(settings.OPENAI_API_KEY)
     )
 
 
-def get_vector_store():
+def get_vector_store() -> Chroma:
     """Chromaのベクトルストアインスタンスを取得"""
     # Chromaの永続化ディレクトリ（絶対パスで指定）
     persist_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../chroma_db"))
@@ -30,7 +32,7 @@ def get_vector_store():
     )
 
 
-def get_simple_retriever(vector_store: Chroma | None = None):
+def get_simple_retriever(vector_store: Chroma | None = None) -> Any:
     """シンプルなベクトル検索リトリーバーを取得（個々のレスを検索）"""
     if vector_store is None:
         vector_store = get_vector_store()
@@ -39,7 +41,7 @@ def get_simple_retriever(vector_store: Chroma | None = None):
     return vector_store.as_retriever(search_kwargs={"k": 10})
 
 
-def get_parent_document_retriever(vector_store: Chroma | None = None):
+def get_parent_document_retriever(vector_store: Chroma | None = None) -> ParentDocumentRetriever:
     """ParentDocumentRetrieverのインスタンスを取得"""
     if vector_store is None:
         vector_store = get_vector_store()
@@ -66,7 +68,7 @@ def get_parent_document_retriever(vector_store: Chroma | None = None):
     return retriever
 
 
-def create_retriever_chain():
+def create_retriever_chain() -> ParentDocumentRetriever:
     """検索チェーンを作成"""
     retriever = get_parent_document_retriever()
     return retriever

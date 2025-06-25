@@ -2,7 +2,9 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
+
+from pydantic import SecretStr
 
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
@@ -20,16 +22,16 @@ class StreamingCallbackHandler(AsyncCallbackHandler):
     def __init__(self, queue: asyncio.Queue):
         self.queue = queue
 
-    async def on_llm_new_token(self, token: str, **kwargs):
+    async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         """新しいトークンが生成されたときに呼ばれる"""
         await self.queue.put(token)
 
-    async def on_llm_end(self, response, **kwargs):
+    async def on_llm_end(self, response: Any, **kwargs: Any) -> None:
         """LLMの生成が終了したときに呼ばれる"""
         await self.queue.put(None)  # 終了シグナル
 
 
-def get_rag_prompt():
+def get_rag_prompt() -> ChatPromptTemplate:
     """RAG用のプロンプトテンプレートを取得"""
     template = """あなたは賢い掲示板のアシスタントです。
 提供された掲示板の過去ログの文脈を元に、ユーザーの質問に日本語で回答してください。
@@ -46,12 +48,12 @@ def get_rag_prompt():
     return ChatPromptTemplate.from_template(template)
 
 
-def format_docs(docs):
+def format_docs(docs: list[Any]) -> str:
     """検索結果のドキュメントをフォーマット"""
     return "\n\n---\n\n".join(doc.page_content for doc in docs)
 
 
-async def extract_relevant_posts(docs, question: str) -> list[dict[str, Any]]:
+async def extract_relevant_posts(docs: list[Any], question: str) -> list[dict[str, Any]]:
     """検索結果から質問に関連する具体的なレス番号を抽出"""
     if not docs:
         return []
@@ -63,7 +65,7 @@ async def extract_relevant_posts(docs, question: str) -> list[dict[str, Any]]:
     llm = ChatOpenAI(
         model="gpt-3.5-turbo",  # 軽量モデルで十分
         temperature=0,  # 正確性重視
-        openai_api_key=settings.OPENAI_API_KEY,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
     )
 
     citation_prompt = ChatPromptTemplate.from_template(
@@ -99,7 +101,7 @@ async def extract_relevant_posts(docs, question: str) -> list[dict[str, Any]]:
             )
 
             # レス番号を抽出
-            result = response.content.strip()
+            result = response.content.strip() if isinstance(response.content, str) else ""
             if result and result != "なし":
                 numbers = [int(n.strip()) for n in result.split(",") if n.strip().isdigit()]
                 # マッピングに存在するレス番号のみを採用
@@ -128,7 +130,7 @@ async def extract_relevant_posts(docs, question: str) -> list[dict[str, Any]]:
     return sorted(unique_citations, key=lambda x: x["no"])
 
 
-def extract_sources(docs) -> list[dict[str, Any]]:
+def extract_sources(docs: list[Any]) -> list[dict[str, Any]]:
     """ドキュメントからソース情報を抽出"""
     sources = []
     for doc in docs:
@@ -176,7 +178,7 @@ def format_source_citations(sources: list[dict[str, Any]]) -> list[dict[str, str
     return formatted_sources
 
 
-async def create_rag_chain(streaming: bool = True):
+async def create_rag_chain(streaming: bool = True) -> Any:
     """RAGチェーンを作成"""
     # コンポーネントの初期化
     retriever = get_parent_document_retriever()
@@ -186,12 +188,12 @@ async def create_rag_chain(streaming: bool = True):
     llm = ChatOpenAI(
         model=settings.OPENAI_MODEL,
         temperature=0.7,
-        openai_api_key=settings.OPENAI_API_KEY,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
         streaming=streaming,
     )
 
     # チェーンの構築
-    chain = (
+    chain: Any = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | prompt
         | llm
@@ -204,7 +206,7 @@ async def create_rag_chain(streaming: bool = True):
 async def ask_with_streaming(question: str) -> AsyncIterator[str]:
     """ストリーミングで質問に回答し、最後に出典情報も送信"""
     # キューの作成
-    queue = asyncio.Queue()
+    queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     # コールバックハンドラーの作成
     callback = StreamingCallbackHandler(queue)
@@ -213,7 +215,7 @@ async def ask_with_streaming(question: str) -> AsyncIterator[str]:
     llm = ChatOpenAI(
         model=settings.OPENAI_MODEL,
         temperature=0.7,
-        openai_api_key=settings.OPENAI_API_KEY,
+        api_key=SecretStr(settings.OPENAI_API_KEY),
         streaming=True,
         callbacks=[callback],
     )
@@ -232,7 +234,7 @@ async def ask_with_streaming(question: str) -> AsyncIterator[str]:
     context = format_docs(docs)
 
     # チェーンの構築
-    chain = (
+    chain: Any = (
         {"context": lambda _: context, "question": RunnablePassthrough()}
         | prompt
         | llm
@@ -262,4 +264,4 @@ async def ask_question(question: str) -> str:
     """質問に対して回答を生成（非ストリーミング）"""
     chain = await create_rag_chain(streaming=False)
     response = await chain.ainvoke(question)
-    return response
+    return cast(str, response)

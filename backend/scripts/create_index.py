@@ -24,7 +24,7 @@ from app.rag.loader import PostgresResLoader, ThreadAwareLoader
 from app.rag.retriever import get_parent_document_retriever, get_vector_store
 
 
-async def create_index():
+async def create_index() -> None:
     """ベクトルインデックスを作成"""
     print("Starting index creation process...")
 
@@ -135,7 +135,7 @@ async def create_index():
         print(f"- Average res per parent document: {total_res / len(parent_docs):.1f}")
 
 
-def main():
+def main() -> None:
     """メイン関数"""
     # 環境変数の確認
     if not settings.OPENAI_API_KEY:

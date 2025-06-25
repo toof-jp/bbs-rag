@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic_settings import BaseSettings
 
 
@@ -22,4 +24,11 @@ class Settings(BaseSettings):
         case_sensitive = True
 
 
-settings = Settings()
+# Type checking時はダミーの値を使用
+if TYPE_CHECKING:
+    settings = Settings(
+        DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy",
+        OPENAI_API_KEY="sk-dummy",
+    )
+else:
+    settings = Settings()  # type: ignore[call-arg]

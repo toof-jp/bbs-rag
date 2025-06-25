@@ -1,7 +1,9 @@
+from collections.abc import AsyncIterator, Iterator
+
 import asyncpg
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
@@ -19,7 +21,7 @@ Base = declarative_base()
 
 
 # 非同期データベース接続
-async def get_async_db_connection():
+async def get_async_db_connection() -> AsyncIterator[asyncpg.Connection]:
     """非同期でデータベース接続を取得"""
     conn = await asyncpg.connect(database_url)
     try:
@@ -28,7 +30,7 @@ async def get_async_db_connection():
         await conn.close()
 
 
-def get_db():
+def get_db() -> Iterator[Session]:
     """同期的なデータベースセッションを取得"""
     db = SessionLocal()
     try:
