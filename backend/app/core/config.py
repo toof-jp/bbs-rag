@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://user:password@localhost:5432/bbs2"
 
     # OpenAI
-    openai_api_key: str
+    openai_api_key: str = ""
 
     # Vector Store
     collection_name: str = "bbs_rag_collection"

@@ -3,6 +3,7 @@
 import asyncio
 import json
 from typing import Any, AsyncIterator, Optional
+from uuid import UUID
 
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain.chains import create_retrieval_chain
@@ -18,20 +19,27 @@ from app.rag.schemas import CitationPost
 class StreamingCallbackHandler(AsyncCallbackHandler):
     """Callback handler for streaming tokens."""
 
-    def __init__(self):
-        self.tokens = asyncio.Queue()
+    def __init__(self) -> None:
+        self.tokens: asyncio.Queue[Optional[str]] = asyncio.Queue()
         self.done = False
 
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         """Called when a new token is generated."""
         await self.tokens.put(token)
 
-    async def on_llm_end(self, *args, **kwargs: Any) -> None:
+    async def on_llm_end(self, *args: Any, **kwargs: Any) -> None:
         """Called when LLM generation ends."""
         self.done = True
         await self.tokens.put(None)  # Signal end of stream
 
-    async def on_llm_error(self, error: Exception, **kwargs: Any) -> None:
+    async def on_llm_error(
+        self,
+        error: BaseException,
+        *,
+        run_id: UUID,
+        parent_run_id: Optional[UUID] = None,
+        **kwargs: Any,
+    ) -> None:
         """Called when LLM encounters an error."""
         self.done = True
         await self.tokens.put(None)
@@ -77,7 +85,7 @@ async def extract_citations(context: str, answer: str) -> list[CitationPost]:
     llm = ChatOpenAI(
         model=settings.citation_model,
         temperature=0,
-        openai_api_key=settings.openai_api_key,
+        api_key=settings.openai_api_key,
     )
 
     prompt = ChatPromptTemplate.from_template(
@@ -107,7 +115,7 @@ async def extract_citations(context: str, answer: str) -> list[CitationPost]:
 
     try:
         result = await chain.ainvoke({"context": context, "answer": answer})
-        citations_data = json.loads(result.content)
+        citations_data = json.loads(str(result.content))
 
         citations = []
         for item in citations_data:
@@ -128,7 +136,7 @@ async def extract_citations(context: str, answer: str) -> list[CitationPost]:
 class RAGChain:
     """RAG chain with streaming support."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.retriever = get_retriever()
         self.prompt = create_prompt_template()
 
@@ -151,8 +159,7 @@ class RAGChain:
         llm = ChatOpenAI(
             model=settings.llm_model,
             temperature=settings.llm_temperature,
-            max_tokens=settings.max_tokens,
-            openai_api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,
             streaming=True,
             callbacks=[stream_handler],
         )
@@ -173,7 +180,7 @@ class RAGChain:
         # Wait for completion
         await task
 
-    async def ainvoke(self, question: str, conversation_id: Optional[str] = None) -> dict:
+    async def ainvoke(self, question: str, conversation_id: Optional[str] = None) -> dict[str, Any]:
         """Get the complete answer with citations.
 
         Args:
@@ -187,8 +194,7 @@ class RAGChain:
         llm = ChatOpenAI(
             model=settings.llm_model,
             temperature=settings.llm_temperature,
-            max_tokens=settings.max_tokens,
-            openai_api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,
         )
 
         # Create document chain

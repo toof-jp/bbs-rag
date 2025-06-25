@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from langchain.retrievers import ParentDocumentRetriever
-from langchain.storage import LocalFileStore
+from langchain.storage import LocalFileStore  # type: ignore[import]
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
@@ -97,7 +97,7 @@ def create_retriever(
     # Initialize embeddings
     embeddings = OpenAIEmbeddings(
         model=settings.embedding_model,
-        openai_api_key=settings.openai_api_key,
+        api_key=settings.openai_api_key,
     )
 
     # Initialize vector store
@@ -122,7 +122,7 @@ def create_retriever(
     # Create retriever
     retriever = ParentDocumentRetriever(
         vectorstore=vectorstore,
-        docstore=docstore,
+        docstore=docstore,  # type: ignore[arg-type]
         child_splitter=child_splitter,
         search_kwargs={"k": settings.search_k},
     )

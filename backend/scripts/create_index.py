@@ -6,6 +6,7 @@ import json
 import sys
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -15,7 +16,7 @@ from app.rag.loader import PostgresResLoader
 from app.rag.retriever import SlidingWindowChunker, create_retriever
 
 
-def load_index_metadata() -> dict:
+def load_index_metadata() -> dict[str, Any]:
     """Load index metadata from file."""
     metadata_path = Path("index_metadata.json")
     if metadata_path.exists():
@@ -24,7 +25,7 @@ def load_index_metadata() -> dict:
     return {"last_processed_no": 0, "last_updated": None}
 
 
-def save_index_metadata(metadata: dict) -> None:
+def save_index_metadata(metadata: dict[str, Any]) -> None:
     """Save index metadata to file."""
     with open("index_metadata.json", "w") as f:
         json.dump(metadata, f, indent=2)
@@ -96,7 +97,7 @@ async def create_index(incremental: bool = False) -> None:
     print("✅ Index creation completed successfully!")
 
 
-async def main():
+async def main() -> None:
     """Main entry point."""
     import argparse
 

@@ -11,7 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from scripts.create_index import create_index
 
 
-async def main():
+async def main() -> None:
     """Run incremental index update."""
     print("🔄 Running incremental index update...")
     await create_index(incremental=True)
