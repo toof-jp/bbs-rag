@@ -1,8 +1,7 @@
-from sqlalchemy import create_engine, text
+import asyncpg
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-import asyncpg
-from typing import AsyncGenerator
 
 from app.core.config import settings
 

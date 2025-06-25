@@ -1,12 +1,14 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime
+from sqlalchemy import Column, DateTime, Integer, Text
+
 from app.core.database import Base
 
 
 class Res(Base):
     """掲示板のレステーブルのSQLAlchemyモデル"""
+
     __tablename__ = "res"
     __table_args__ = {"schema": "public"}
-    
+
     no = Column(Integer, primary_key=True, index=True)
     name_and_trip = Column(Text, nullable=False)
     datetime = Column(DateTime, nullable=False)

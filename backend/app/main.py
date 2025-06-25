@@ -1,9 +1,10 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from app.core.config import settings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.endpoints import chat
+from app.core.config import settings
 
 
 @asynccontextmanager
@@ -18,7 +19,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS設定
@@ -30,10 +31,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ルートエンドポイント
 @app.get("/")
 def read_root():
     return {"message": "Welcome to BBS RAG API", "docs": "/docs"}
+
 
 # APIルーターの登録
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
