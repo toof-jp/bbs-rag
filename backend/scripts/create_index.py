@@ -21,7 +21,8 @@ def load_index_metadata() -> dict[str, Any]:
     metadata_path = Path("index_metadata.json")
     if metadata_path.exists():
         with open(metadata_path, "r") as f:
-            return json.load(f)
+            data: dict[str, Any] = json.load(f)
+            return data
     return {"last_processed_no": 0, "last_updated": None}
 
 
