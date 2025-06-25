@@ -1,5 +1,6 @@
 """Configuration settings for the BBS RAG application."""
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://user:password@localhost:5432/bbs2"
 
     # OpenAI
-    openai_api_key: str = ""
+    openai_api_key: SecretStr = SecretStr("")
 
     # Vector Store
     collection_name: str = "bbs_rag_collection"

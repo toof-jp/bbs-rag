@@ -4,7 +4,7 @@ import os
 from typing import Optional
 
 from langchain.retrievers import ParentDocumentRetriever
-from langchain.storage import LocalFileStore  # type: ignore[import]
+from langchain.storage import LocalFileStore
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_core.documents import Document
