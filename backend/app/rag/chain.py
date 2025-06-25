@@ -4,13 +4,12 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Any, cast
 
-from pydantic import SecretStr
-
 from langchain.callbacks.base import AsyncCallbackHandler
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from app.core.config import settings
 from app.rag.retriever import get_parent_document_retriever

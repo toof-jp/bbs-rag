@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Dict
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +35,7 @@ app.add_middleware(
 
 # ルートエンドポイント
 @app.get("/")
-def read_root() -> Dict[str, str]:
+def read_root() -> dict[str, str]:
     return {"message": "Welcome to BBS RAG API", "docs": "/docs"}
 
 

@@ -1,6 +1,5 @@
 import json
 from collections.abc import AsyncIterator
-from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
@@ -109,7 +108,7 @@ async def ask_question_endpoint(request: AskRequest) -> EventSourceResponse:
 
 
 @router.post("/ask/sync")
-async def ask_question_sync(request: AskRequest) -> Dict[str, str]:
+async def ask_question_sync(request: AskRequest) -> dict[str, str]:
     """
     非ストリーミング版の質問応答エンドポイント（デバッグ用）
     """
@@ -121,6 +120,6 @@ async def ask_question_sync(request: AskRequest) -> Dict[str, str]:
 
 
 @router.get("/health")
-async def health_check() -> Dict[str, str]:
+async def health_check() -> dict[str, str]:
     """ヘルスチェックエンドポイント"""
     return {"status": "healthy", "service": "chat"}
