@@ -5,7 +5,6 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-
 # Set test environment variables before importing app
 os.environ["OPENAI_API_KEY"] = "sk-test"
 os.environ["DATABASE_URL"] = "postgresql://test:test@localhost:5432/test_bbs2"
