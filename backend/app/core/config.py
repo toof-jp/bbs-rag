@@ -1,7 +1,5 @@
 """Configuration settings for the BBS RAG application."""
 
-from typing import Optional
-
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 

@@ -1,7 +1,7 @@
 """Retriever implementation with sliding window strategy."""
 
 import os
-from typing import Any, Optional
+from typing import Optional
 
 from langchain.retrievers import ParentDocumentRetriever
 from langchain.storage import LocalFileStore
