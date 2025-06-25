@@ -1,0 +1,12 @@
+{
+  "generatorName": "typescript-fetch",
+  "outputDir": "./src/api",
+  "inputSpec": "http://localhost:8000/openapi.json",
+  "generateApiDocumentation": true,
+  "generateModelDocumentation": true,
+  "additionalProperties": {
+    "npmName": "bbs-rag-api",
+    "supportsES6": true,
+    "withInterfaces": true
+  }
+}
