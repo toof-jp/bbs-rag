@@ -1,5 +1,4 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+"""Main FastAPI application."""
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,37 +6,41 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import chat
 from app.core.config import settings
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # スタートアップ時の処理
-    print("Starting up BBS RAG API...")
-    yield
-    # シャットダウン時の処理
-    print("Shutting down...")
-
-
+# Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
+    title=settings.project_name,
+    version=settings.project_version,
+    openapi_url=f"{settings.api_v1_str}/openapi.json",
 )
 
-# CORS設定
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.backend_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(
+    chat.router,
+    prefix=f"{settings.api_v1_str}",
+    tags=["chat"],
+)
 
-# ルートエンドポイント
+
 @app.get("/")
-def read_root() -> dict[str, str]:
-    return {"message": "Welcome to BBS RAG API", "docs": "/docs"}
+async def root():
+    """Root endpoint."""
+    return {
+        "message": "BBS RAG API",
+        "version": settings.project_version,
+        "docs": "/docs",
+    }
 
 
-# APIルーターの登録
-app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy"}

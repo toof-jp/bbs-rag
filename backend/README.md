@@ -1,55 +1,62 @@
 # BBS RAG Backend
 
-FastAPI backend for the BBS RAG application.
+## セットアップ
 
-## Configuration
-
-### OpenAI Model Selection
-
-Configure the AI models in your `.env` file:
-
-```env
-# Choose your model based on cost/quality tradeoff:
-OPENAI_MODEL=gpt-4o-mini       # Default: $0.0005/query (recommended)
-# OPENAI_MODEL=gpt-3.5-turbo   # $0.0015/query (budget option)
-# OPENAI_MODEL=gpt-4o          # $0.0081/query (highest quality)
-
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small  # Default embedding model
-```
-
-## Setup with uv
+### 1. 環境変数の設定
 
 ```bash
-# Install uv
+cp .env.example .env
+# .envファイルを編集して、必要な情報を設定
+```
+
+### 2. 依存関係のインストール (uvを使用)
+
+```bash
+# uvのインストール（未インストールの場合）
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Create virtual environment
-uv venv
+# 依存関係のインストール
+make install
 
-# Activate virtual environment
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-uv pip install -e .
-
-# Install development dependencies
-uv pip install -e ".[dev]"
+# 開発用依存関係も含める場合
+make install-dev
 ```
 
-## Development
+### 3. ベクトルインデックスの作成
 
 ```bash
-# Run the development server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 初回のフルインデックス作成
+make create-index
 
-# Run linting
-ruff check .
-black --check .
-
-# Run type checking
-mypy .
-
-# Format code
-black .
-ruff check --fix .
+# 増分更新（新しい投稿のみ）
+make update-index
 ```
+
+### 4. 開発サーバーの起動
+
+```bash
+make dev
+# または
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## 開発コマンド
+
+```bash
+# コードのフォーマット
+make format
+
+# リント実行
+make lint
+
+# テスト実行
+make test
+```
+
+## API仕様
+
+開発サーバー起動後、以下のURLでAPIドキュメントを確認できます：
+
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI JSON: http://localhost:8000/api/v1/openapi.json

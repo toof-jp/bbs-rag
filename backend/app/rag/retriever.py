@@ -1,89 +1,135 @@
+"""Retriever implementation with sliding window strategy."""
+
 import os
-from typing import Any
+from typing import Any, Optional
 
 from langchain.retrievers import ParentDocumentRetriever
 from langchain.storage import LocalFileStore
-from langchain.storage._lc_store import create_kv_docstore
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
+from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from pydantic import SecretStr
 
 from app.core.config import settings
 
 
-def get_embeddings() -> OpenAIEmbeddings:
-    """埋め込みモデルのインスタンスを取得"""
-    return OpenAIEmbeddings(
-        model=settings.OPENAI_EMBEDDING_MODEL, api_key=SecretStr(settings.OPENAI_API_KEY)
+class SlidingWindowChunker:
+    """Create sliding window chunks from documents."""
+
+    def __init__(self, window_size: int = 50, overlap: int = 20):
+        """Initialize the chunker.
+        
+        Args:
+            window_size: Number of posts per window
+            overlap: Number of overlapping posts between windows
+        """
+        self.window_size = window_size
+        self.overlap = overlap
+
+    def create_windows(self, documents: list[Document]) -> list[Document]:
+        """Create sliding window documents from individual post documents.
+        
+        Args:
+            documents: List of individual post documents
+            
+        Returns:
+            List of window documents
+        """
+        if not documents:
+            return []
+
+        windows = []
+        step = self.window_size - self.overlap
+
+        for i in range(0, len(documents), step):
+            # Get posts for this window
+            window_docs = documents[i : i + self.window_size]
+            
+            if not window_docs:
+                break
+
+            # Combine posts into a single window document
+            combined_content = "\n\n---\n\n".join(
+                [
+                    f"No.{doc.metadata['no']} 名前：{doc.metadata['name_and_trip']} "
+                    f"投稿日：{doc.metadata['datetime']}\n{doc.page_content}"
+                    for doc in window_docs
+                ]
+            )
+
+            # Create metadata for the window
+            start_no = window_docs[0].metadata["no"]
+            end_no = window_docs[-1].metadata["no"]
+            
+            window_metadata = {
+                "start_no": start_no,
+                "end_no": end_no,
+                "post_count": len(window_docs),
+                "source": f"window_{start_no}_{end_no}",
+            }
+
+            window_doc = Document(
+                page_content=combined_content,
+                metadata=window_metadata,
+            )
+            
+            windows.append(window_doc)
+
+        return windows
+
+
+def create_retriever(
+    persist_directory: Optional[str] = None,
+    collection_name: Optional[str] = None,
+) -> ParentDocumentRetriever:
+    """Create a ParentDocumentRetriever with sliding window strategy.
+    
+    Args:
+        persist_directory: Directory to persist vector store
+        collection_name: Name of the collection in vector store
+        
+    Returns:
+        Configured ParentDocumentRetriever
+    """
+    persist_dir = persist_directory or settings.chroma_persist_directory
+    collection = collection_name or settings.collection_name
+
+    # Initialize embeddings
+    embeddings = OpenAIEmbeddings(
+        model=settings.embedding_model,
+        openai_api_key=settings.openai_api_key,
     )
 
-
-def get_vector_store() -> Chroma:
-    """Chromaのベクトルストアインスタンスを取得"""
-    # Chromaの永続化ディレクトリ（絶対パスで指定）
-    persist_directory = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../chroma_db"))
-    os.makedirs(persist_directory, exist_ok=True)
-
-    return Chroma(
-        collection_name=settings.COLLECTION_NAME,
-        persist_directory=persist_directory,
-        embedding_function=get_embeddings(),
+    # Initialize vector store
+    vectorstore = Chroma(
+        collection_name=collection,
+        embedding_function=embeddings,
+        persist_directory=persist_dir,
     )
 
-
-def get_simple_retriever(vector_store: Chroma | None = None) -> Any:
-    """シンプルなベクトル検索リトリーバーを取得（個々のレスを検索）"""
-    if vector_store is None:
-        vector_store = get_vector_store()
-
-    # 通常のベクトル検索を使用（k=10で多めに取得）
-    return vector_store.as_retriever(search_kwargs={"k": 10})
-
-
-def get_parent_document_retriever(vector_store: Chroma | None = None) -> ParentDocumentRetriever:
-    """ParentDocumentRetrieverのインスタンスを取得"""
-    if vector_store is None:
-        vector_store = get_vector_store()
-
-    # ドキュメントストアの設定（親ドキュメントを保存、絶対パスで指定）
-    docstore_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../docstore"))
+    # Initialize docstore for parent documents
+    docstore_path = os.path.join(os.path.dirname(persist_dir), "docstore")
     os.makedirs(docstore_path, exist_ok=True)
-    file_store = LocalFileStore(docstore_path)
-    docstore = create_kv_docstore(file_store)
+    docstore = LocalFileStore(docstore_path)
 
-    # 子ドキュメント用のテキストスプリッター
+    # Create child text splitter (for splitting parent documents)
     child_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=400, chunk_overlap=50, separators=["\n\n", "\n", "。", "、", " ", ""]
+        chunk_size=settings.child_chunk_size,
+        chunk_overlap=50,
+        separators=["\n\n---\n\n", "\n\n", "\n", " ", ""],
     )
 
-    # ParentDocumentRetrieverの作成
+    # Create retriever
     retriever = ParentDocumentRetriever(
-        vectorstore=vector_store,
+        vectorstore=vectorstore,
         docstore=docstore,
         child_splitter=child_splitter,
-        search_kwargs={"k": 4},  # 取得する親ドキュメントの数
+        search_kwargs={"k": settings.search_k},
     )
 
     return retriever
 
 
-def create_retriever_chain() -> ParentDocumentRetriever:
-    """検索チェーンを作成"""
-    retriever = get_parent_document_retriever()
-    return retriever
-
-
-async def search_similar_documents(query: str, k: int = 4) -> list[dict]:
-    """類似ドキュメントを検索して返す"""
-    retriever = get_parent_document_retriever()
-
-    # 検索実行
-    docs = await retriever.aget_relevant_documents(query)
-
-    # 結果を整形して返す
-    results = []
-    for doc in docs:
-        results.append({"content": doc.page_content, "metadata": doc.metadata})
-
-    return results
+def get_retriever() -> ParentDocumentRetriever:
+    """Get the default retriever instance."""
+    return create_retriever()

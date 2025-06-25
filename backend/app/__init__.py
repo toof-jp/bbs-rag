@@ -1,0 +1,1 @@
+"""BBS RAG Backend Application."""

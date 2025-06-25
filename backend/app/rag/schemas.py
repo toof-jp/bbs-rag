@@ -1,37 +1,39 @@
-from datetime import datetime
+"""Data structures for the RAG pipeline."""
 
-from pydantic import BaseModel
+from typing import Optional
 
-
-class ResDocument(BaseModel):
-    """掲示板のレスを表すデータモデル"""
-
-    no: int
-    name_and_trip: str
-    datetime: datetime
-    datetime_text: str
-    id: str
-    main_text: str
-    main_text_html: str
-    oekaki_id: int | None = None
+from pydantic import BaseModel, Field
 
 
-class AskRequest(BaseModel):
-    """質問リクエストのスキーマ"""
+class QuestionRequest(BaseModel):
+    """Request model for asking questions."""
 
-    question: str
-    conversation_id: str | None = None
+    question: str = Field(..., description="The question to ask about the bulletin board")
+    conversation_id: Optional[str] = Field(
+        None, description="Optional conversation ID for tracking"
+    )
 
 
 class StreamToken(BaseModel):
-    """ストリーミング応答の単一トークン"""
+    """Model for streaming tokens."""
 
-    token: str
+    token: str = Field(..., description="The token to stream")
+    type: str = Field(default="token", description="Type of the stream message")
 
 
-class RetrievedContext(BaseModel):
-    """検索で取得したコンテキスト情報"""
+class CitationPost(BaseModel):
+    """Model for cited post information."""
 
-    content: str
-    metadata: dict
-    score: float | None = None
+    no: int = Field(..., description="Post number")
+    name_and_trip: str = Field(..., description="Author name and trip")
+    datetime: str = Field(..., description="Post datetime")
+    content: str = Field(..., description="Post content excerpt")
+
+
+class AnswerResponse(BaseModel):
+    """Response model for answers with citations."""
+
+    answer: str = Field(..., description="The generated answer")
+    citations: list[CitationPost] = Field(
+        default_factory=list, description="List of cited posts"
+    )
