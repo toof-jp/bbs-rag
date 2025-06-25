@@ -32,35 +32,35 @@ def save_index_metadata(metadata: dict) -> None:
 
 async def create_index(incremental: bool = False) -> None:
     """Create or update the vector index.
-    
+
     Args:
         incremental: If True, only process new posts since last update
     """
     print("🚀 Starting index creation...")
-    
+
     # Load metadata
     metadata = load_index_metadata()
     start_no = None
-    
+
     if incremental and metadata["last_processed_no"] > 0:
         start_no = metadata["last_processed_no"] + 1
         print(f"📊 Incremental update: Starting from post No.{start_no}")
     else:
         print("📊 Full index creation")
-        
+
     # Initialize loader
     loader = PostgresResLoader(start_no=start_no)
-    
+
     # Load documents
     print("📖 Loading posts from database...")
     documents = loader.load()
-    
+
     if not documents:
         print("✅ No new posts to process")
         return
-        
+
     print(f"📄 Loaded {len(documents)} posts")
-    
+
     # Create sliding windows
     print("🪟 Creating sliding windows...")
     chunker = SlidingWindowChunker(
@@ -69,14 +69,14 @@ async def create_index(incremental: bool = False) -> None:
     )
     windows = chunker.create_windows(documents)
     print(f"📦 Created {len(windows)} windows")
-    
+
     # Initialize retriever
     print("🔧 Initializing retriever...")
     retriever = create_retriever()
-    
+
     # Add documents to index
     print("💾 Adding documents to vector store...")
-    
+
     # Add documents in batches to show progress
     batch_size = 10
     for i in range(0, len(windows), batch_size):
@@ -84,7 +84,7 @@ async def create_index(incremental: bool = False) -> None:
         retriever.add_documents(batch)
         progress = min(i + batch_size, len(windows))
         print(f"   Progress: {progress}/{len(windows)} windows indexed")
-    
+
     # Update metadata
     if documents:
         last_no = max(doc.metadata["no"] for doc in documents)
@@ -92,14 +92,14 @@ async def create_index(incremental: bool = False) -> None:
         metadata["last_updated"] = datetime.now().isoformat()
         save_index_metadata(metadata)
         print(f"📝 Updated metadata: last processed No.{last_no}")
-    
+
     print("✅ Index creation completed successfully!")
 
 
 async def main():
     """Main entry point."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Create vector index for BBS RAG")
     parser.add_argument(
         "--incremental",
@@ -107,9 +107,9 @@ async def main():
         action="store_true",
         help="Perform incremental update instead of full rebuild",
     )
-    
+
     args = parser.parse_args()
-    
+
     try:
         await create_index(incremental=args.incremental)
     except KeyboardInterrupt:

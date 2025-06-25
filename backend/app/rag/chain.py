@@ -66,11 +66,11 @@ def create_prompt_template() -> ChatPromptTemplate:
 
 async def extract_citations(context: str, answer: str) -> list[CitationPost]:
     """Extract citation post numbers from the answer using GPT-3.5-turbo.
-    
+
     Args:
         context: The context containing posts
         answer: The generated answer
-        
+
     Returns:
         List of cited posts
     """
@@ -104,11 +104,11 @@ async def extract_citations(context: str, answer: str) -> list[CitationPost]:
     )
 
     chain = prompt | llm
-    
+
     try:
         result = await chain.ainvoke({"context": context, "answer": answer})
         citations_data = json.loads(result.content)
-        
+
         citations = []
         for item in citations_data:
             citation = CitationPost(
@@ -118,7 +118,7 @@ async def extract_citations(context: str, answer: str) -> list[CitationPost]:
                 content=item["content"],
             )
             citations.append(citation)
-            
+
         return citations
     except Exception as e:
         print(f"Error extracting citations: {e}")
@@ -136,11 +136,11 @@ class RAGChain:
         self, question: str, conversation_id: Optional[str] = None
     ) -> AsyncIterator[str]:
         """Stream the answer for a question.
-        
+
         Args:
             question: The question to answer
             conversation_id: Optional conversation ID
-            
+
         Yields:
             Tokens of the generated answer
         """
@@ -164,9 +164,7 @@ class RAGChain:
         retrieval_chain = create_retrieval_chain(self.retriever, document_chain)
 
         # Run chain asynchronously
-        task = asyncio.create_task(
-            retrieval_chain.ainvoke({"input": question})
-        )
+        task = asyncio.create_task(retrieval_chain.ainvoke({"input": question}))
 
         # Stream tokens
         async for token in stream_handler.aiter():
@@ -177,11 +175,11 @@ class RAGChain:
 
     async def ainvoke(self, question: str, conversation_id: Optional[str] = None) -> dict:
         """Get the complete answer with citations.
-        
+
         Args:
             question: The question to answer
             conversation_id: Optional conversation ID
-            
+
         Returns:
             Dictionary with answer and citations
         """

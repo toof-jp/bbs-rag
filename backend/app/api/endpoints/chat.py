@@ -14,11 +14,11 @@ router = APIRouter()
 
 async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator[str, None]:
     """Generate SSE stream for the answer.
-    
+
     Args:
         question: The question to answer
         conversation_id: Conversation ID for tracking
-        
+
     Yields:
         SSE formatted events
     """
@@ -28,11 +28,11 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
             # Format as SSE event
             event_data = StreamToken(token=token).model_dump_json()
             yield f"data: {event_data}\n\n"
-            
+
         # Send completion event
         completion_data = json.dumps({"type": "complete"})
         yield f"data: {completion_data}\n\n"
-        
+
     except Exception as e:
         # Send error event
         error_data = json.dumps({"type": "error", "message": str(e)})
@@ -42,21 +42,21 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
 @router.post("/ask")
 async def ask_question(request: QuestionRequest) -> EventSourceResponse:
     """Ask a question about the bulletin board content.
-    
+
     This endpoint streams the answer using Server-Sent Events (SSE).
-    
+
     Args:
         request: Question request with question text and optional conversation ID
-        
+
     Returns:
         EventSourceResponse streaming the answer tokens
     """
     if not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
-    
+
     # Use provided conversation_id or generate a default one
     conversation_id = request.conversation_id or "default"
-    
+
     return EventSourceResponse(
         generate_stream(request.question, conversation_id),
         media_type="text/event-stream",

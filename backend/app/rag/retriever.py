@@ -18,7 +18,7 @@ class SlidingWindowChunker:
 
     def __init__(self, window_size: int = 50, overlap: int = 20):
         """Initialize the chunker.
-        
+
         Args:
             window_size: Number of posts per window
             overlap: Number of overlapping posts between windows
@@ -28,10 +28,10 @@ class SlidingWindowChunker:
 
     def create_windows(self, documents: list[Document]) -> list[Document]:
         """Create sliding window documents from individual post documents.
-        
+
         Args:
             documents: List of individual post documents
-            
+
         Returns:
             List of window documents
         """
@@ -44,7 +44,7 @@ class SlidingWindowChunker:
         for i in range(0, len(documents), step):
             # Get posts for this window
             window_docs = documents[i : i + self.window_size]
-            
+
             if not window_docs:
                 break
 
@@ -60,7 +60,7 @@ class SlidingWindowChunker:
             # Create metadata for the window
             start_no = window_docs[0].metadata["no"]
             end_no = window_docs[-1].metadata["no"]
-            
+
             window_metadata = {
                 "start_no": start_no,
                 "end_no": end_no,
@@ -72,7 +72,7 @@ class SlidingWindowChunker:
                 page_content=combined_content,
                 metadata=window_metadata,
             )
-            
+
             windows.append(window_doc)
 
         return windows
@@ -83,11 +83,11 @@ def create_retriever(
     collection_name: Optional[str] = None,
 ) -> ParentDocumentRetriever:
     """Create a ParentDocumentRetriever with sliding window strategy.
-    
+
     Args:
         persist_directory: Directory to persist vector store
         collection_name: Name of the collection in vector store
-        
+
     Returns:
         Configured ParentDocumentRetriever
     """

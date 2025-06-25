@@ -34,6 +34,4 @@ class AnswerResponse(BaseModel):
     """Response model for answers with citations."""
 
     answer: str = Field(..., description="The generated answer")
-    citations: list[CitationPost] = Field(
-        default_factory=list, description="List of cited posts"
-    )
+    citations: list[CitationPost] = Field(default_factory=list, description="List of cited posts")
