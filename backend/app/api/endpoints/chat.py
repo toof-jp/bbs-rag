@@ -12,9 +12,7 @@ from app.rag.schemas import QuestionRequest, StreamToken
 router = APIRouter()
 
 
-async def generate_stream(
-    question: str, conversation_id: str
-) -> AsyncGenerator[str, None]:
+async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator[str, None]:
     """Generate SSE stream for the answer.
 
     Args:

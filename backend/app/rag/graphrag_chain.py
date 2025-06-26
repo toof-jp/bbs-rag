@@ -79,9 +79,7 @@ class GraphRAGChain:
         )
 
         # Search for similar documents
-        docs = await asyncio.to_thread(
-            vectorstore.similarity_search, state["question"], k=5
-        )
+        docs = await asyncio.to_thread(vectorstore.similarity_search, state["question"], k=5)
 
         # Extract post IDs from metadata
         post_ids = []
@@ -118,9 +116,7 @@ class GraphRAGChain:
         """Synthesize context for LLM."""
         logger.info("Synthesizing context")
 
-        formatted_context = self.graph_traverser.format_context_for_llm(
-            state["graph_context"]
-        )
+        formatted_context = self.graph_traverser.format_context_for_llm(state["graph_context"])
 
         state["formatted_context"] = formatted_context
         return state

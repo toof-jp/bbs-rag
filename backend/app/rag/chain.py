@@ -180,9 +180,7 @@ class RAGChain:
         # Wait for completion
         await task
 
-    async def ainvoke(
-        self, question: str, conversation_id: Optional[str] = None
-    ) -> dict[str, Any]:
+    async def ainvoke(self, question: str, conversation_id: Optional[str] = None) -> dict[str, Any]:
         """Get the complete answer with citations.
 
         Args:

@@ -135,9 +135,7 @@ class GraphTraverser:
             Dictionary containing posts and relationships
         """
         # Get reply-based context (semantic relationships)
-        reply_posts = self.get_related_posts_recursive(
-            session, start_post_ids, ["IS_REPLY_TO"]
-        )
+        reply_posts = self.get_related_posts_recursive(session, start_post_ids, ["IS_REPLY_TO"])
 
         # Get sequential context (structural relationships)
         sequential_posts = self.get_related_posts_recursive(
@@ -206,9 +204,7 @@ class GraphTraverser:
         for rel in relationships:
             source_no = id_to_no.get(rel.source_node_id, "?")
             target_no = id_to_no.get(rel.target_node_id, "?")
-            formatted_rels.append(
-                f"- No.{source_no} {rel.relationship_type} No.{target_no}"
-            )
+            formatted_rels.append(f"- No.{source_no} {rel.relationship_type} No.{target_no}")
 
         # Combine into final context
         context = "=== CONVERSATION CONTEXT ===\n\n"

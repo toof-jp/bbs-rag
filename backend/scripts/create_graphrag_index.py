@@ -57,10 +57,7 @@ async def create_index(batch_size: int = 100) -> None:
             # Get batch of posts
             posts = (
                 session.execute(
-                    select(Post)
-                    .order_by(Post.source_post_no)
-                    .limit(batch_size)
-                    .offset(offset)
+                    select(Post).order_by(Post.source_post_no).limit(batch_size).offset(offset)
                 )
                 .scalars()
                 .all()

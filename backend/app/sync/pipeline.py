@@ -91,10 +91,7 @@ class DataSyncPipeline:
 
         # Build context for LLM
         context = "\n".join(
-            [
-                f"No.{p.source_post_no}: {p.content[:200]}..."
-                for p in reversed(recent_posts)
-            ]
+            [f"No.{p.source_post_no}: {p.content[:200]}..." for p in reversed(recent_posts)]
         )
 
         # Ask LLM to identify reply relationships
@@ -211,18 +208,14 @@ Example valid responses: "123,145" or "NONE"
                         rag_db.add(rel)
 
                     # Create sequential relationships
-                    seq_rels = self.create_sequential_relationships(
-                        post, source_db, rag_db
-                    )
+                    seq_rels = self.create_sequential_relationships(post, source_db, rag_db)
                     for rel in seq_rels:
                         rag_db.add(rel)
 
                     processed_count += 1
 
                     if processed_count % 10 == 0:
-                        logger.info(
-                            f"Processed {processed_count}/{len(new_posts)} posts"
-                        )
+                        logger.info(f"Processed {processed_count}/{len(new_posts)} posts")
 
                 except Exception as e:
                     logger.error(f"Error processing post No.{post_data['no']}: {e}")
@@ -235,9 +228,7 @@ Example valid responses: "123,145" or "NONE"
 
         return processed_count
 
-    def run_continuous_sync(
-        self, batch_size: int = 100, interval_seconds: int = 60
-    ) -> None:
+    def run_continuous_sync(self, batch_size: int = 100, interval_seconds: int = 60) -> None:
         """Run continuous synchronization."""
         import time
 
@@ -250,9 +241,7 @@ Example valid responses: "123,145" or "NONE"
             try:
                 count = self.sync_batch(batch_size)
                 if count == 0:
-                    logger.info(
-                        f"No new data. Sleeping for {interval_seconds} seconds..."
-                    )
+                    logger.info(f"No new data. Sleeping for {interval_seconds} seconds...")
                 time.sleep(interval_seconds)
             except KeyboardInterrupt:
                 logger.info("Sync interrupted by user")

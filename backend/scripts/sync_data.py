@@ -13,9 +13,7 @@ from app.sync.pipeline import DataSyncPipeline
 
 def main() -> None:
     """Run data sync pipeline."""
-    parser = argparse.ArgumentParser(
-        description="Sync data from source DB to GraphRAG DB"
-    )
+    parser = argparse.ArgumentParser(description="Sync data from source DB to GraphRAG DB")
     parser.add_argument(
         "--batch-size",
         type=int,
