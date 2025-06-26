@@ -30,7 +30,7 @@ class Settings(BaseSettings):
 
     # CORS
     backend_cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
-    
+
     # Backend server settings
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
