@@ -42,7 +42,7 @@ python scripts/init_rag_db.py
 
 # Run data sync pipeline (ETL from source DB to GraphRAG)
 python scripts/sync_data.py  # Continuous sync
-python scripts/sync_data.py --once  # One-time sync
+python scripts/sync_data.py --initial  # Initial full sync (all posts)
 
 # Create GraphRAG vector index
 python scripts/create_graphrag_index.py
@@ -202,9 +202,9 @@ BACKEND_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
    - Source database with bulletin board data (existing)
    - RAG database for GraphRAG (new, empty)
 2. Configure environment variables in `.env`
-3. Initialize RAG database: `make init-db`
-4. Run data sync pipeline: `make sync-once` (or `make sync` for continuous)
-5. Create vector index: `make create-graphrag-index`
+3. Initialize RAG database: `python scripts/init_rag_db.py`
+4. Run data sync pipeline: `python scripts/sync_data.py --initial` (or without --initial for continuous)
+5. Create vector index: `python scripts/create_graphrag_index.py`
 6. Start backend server: `make dev`
 7. Generate TypeScript client from OpenAPI spec
 8. Start frontend development server

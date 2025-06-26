@@ -21,9 +21,9 @@ def main() -> None:
         help="Number of posts to process in each batch (default: 100)",
     )
     parser.add_argument(
-        "--once",
+        "--initial",
         action="store_true",
-        help="Run sync once and exit (default: continuous sync)",
+        help="Run initial full sync (sync all posts) and exit",
     )
     parser.add_argument(
         "--interval",
@@ -36,10 +36,10 @@ def main() -> None:
 
     pipeline = DataSyncPipeline()
 
-    if args.once:
-        print(f"🔄 Running one-time sync with batch size {args.batch_size}...")
-        count = pipeline.sync_batch(args.batch_size)
-        print(f"✅ Synced {count} posts")
+    if args.initial:
+        print(f"🔄 Running initial full sync with batch size {args.batch_size}...")
+        count = pipeline.sync_all(args.batch_size)
+        print(f"✅ Initial sync completed! Total posts synced: {count}")
     else:
         print(
             f"🔄 Starting continuous sync "

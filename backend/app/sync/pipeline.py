@@ -228,6 +228,25 @@ Example valid responses: "123,145" or "NONE"
 
         return processed_count
 
+    def sync_all(self, batch_size: int = 100) -> int:
+        """Sync all posts from source to RAG DB."""
+        total_processed = 0
+        
+        logger.info(f"Starting full sync with batch_size={batch_size}")
+        
+        while True:
+            count = self.sync_batch(batch_size)
+            total_processed += count
+            
+            if count == 0:
+                # No more posts to sync
+                break
+                
+            logger.info(f"Total processed so far: {total_processed}")
+            
+        logger.info(f"Full sync completed. Total posts synced: {total_processed}")
+        return total_processed
+
     def run_continuous_sync(self, batch_size: int = 100, interval_seconds: int = 60) -> None:
         """Run continuous synchronization."""
         import time
