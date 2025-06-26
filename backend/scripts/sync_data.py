@@ -41,7 +41,10 @@ def main() -> None:
         count = pipeline.sync_batch(args.batch_size)
         print(f"✅ Synced {count} posts")
     else:
-        print(f"🔄 Starting continuous sync (batch_size={args.batch_size}, interval={args.interval}s)")
+        print(
+            f"🔄 Starting continuous sync "
+            f"(batch_size={args.batch_size}, interval={args.interval}s)"
+        )
         pipeline.run_continuous_sync(args.batch_size, args.interval)
 
 

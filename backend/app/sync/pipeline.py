@@ -1,11 +1,10 @@
 """Data synchronization pipeline for GraphRAG system."""
 
 import logging
-from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from sqlalchemy import and_, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -37,7 +36,9 @@ class DataSyncPipeline:
         ).scalar()
         return result or 0
 
-    def extract_new_posts(self, source_session: Session, last_no: int, limit: int = 1000) -> list[dict[str, Any]]:
+    def extract_new_posts(
+        self, source_session: Session, last_no: int, limit: int = 1000
+    ) -> list[dict[str, Any]]:
         """Extract new posts from source DB."""
         query = text("""
             SELECT no, name_and_trip, datetime, id, main_text
@@ -67,7 +68,9 @@ class DataSyncPipeline:
             timestamp=post_data["datetime"],
         )
 
-    def infer_reply_relationships(self, post: Post, rag_session: Session, context_window: int = 50) -> list[Relationship]:
+    def infer_reply_relationships(
+        self, post: Post, rag_session: Session, context_window: int = 50
+    ) -> list[Relationship]:
         """Infer IS_REPLY_TO relationships using LLM."""
         # Get recent posts for context
         recent_posts = rag_session.execute(
@@ -87,7 +90,8 @@ class DataSyncPipeline:
         ])
 
         # Ask LLM to identify reply relationships
-        prompt = f"""Given the following conversation context, identify which post numbers (if any) the new post No.{post.source_post_no} is replying to.
+        prompt = f"""Given the following conversation context, identify which post numbers (if any) \
+the new post No.{post.source_post_no} is replying to.
 
 Context:
 {context}
@@ -95,7 +99,8 @@ Context:
 New post No.{post.source_post_no}:
 {post.content}
 
-Return only the post numbers that this post is directly replying to, separated by commas. If it's not replying to any specific post, return "NONE".
+Return only the post numbers that this post is directly replying to, separated by commas. \
+If it's not replying to any specific post, return "NONE".
 Example valid responses: "123,145" or "NONE"
 """
 
@@ -216,7 +221,10 @@ Example valid responses: "123,145" or "NONE"
         """Run continuous synchronization."""
         import time
 
-        logger.info(f"Starting continuous sync with batch_size={batch_size}, interval={interval_seconds}s")
+        logger.info(
+            f"Starting continuous sync with batch_size={batch_size}, "
+            f"interval={interval_seconds}s"
+        )
         
         while True:
             try:

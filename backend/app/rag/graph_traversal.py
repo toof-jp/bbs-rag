@@ -4,10 +4,9 @@ import logging
 from typing import Any, Optional
 from uuid import UUID
 
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, select, text
 from sqlalchemy.orm import Session
 
-from app.core.database import get_rag_db
 from app.models.graph import Post, Relationship
 
 logger = logging.getLogger(__name__)
@@ -217,7 +216,7 @@ class GraphTraverser:
             context += "\n\n=== RELATIONSHIPS ===\n"
             context += "\n".join(formatted_rels)
         
-        context += f"\n\n=== STATISTICS ===\n"
+        context += "\n\n=== STATISTICS ===\n"
         for key, value in context_data["stats"].items():
             context += f"- {key}: {value}\n"
         

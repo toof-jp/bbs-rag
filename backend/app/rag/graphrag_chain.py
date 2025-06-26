@@ -1,13 +1,11 @@
 """GraphRAG chain implementation using LangGraph."""
 
 import asyncio
-import json
 import logging
 from typing import Any, AsyncIterator, Optional, TypedDict
 from uuid import UUID
 
 from langchain.callbacks.base import AsyncCallbackHandler
-from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.graph import END, StateGraph
 from sqlalchemy import select
@@ -93,7 +91,9 @@ class GraphRAGChain:
                 if "source_post_no" in doc.metadata:
                     # Find post by source_post_no
                     post = session.execute(
-                        select(Post).where(Post.source_post_no == int(doc.metadata["source_post_no"]))
+                        select(Post).where(
+                            Post.source_post_no == int(doc.metadata["source_post_no"])
+                        )
                     ).scalar_one_or_none()
                     if post:
                         post_ids.append(post.post_id)
@@ -163,7 +163,9 @@ class GraphRAGChain:
         state["answer"] = response.content
         return state
 
-    async def ainvoke(self, question: str, streaming_handler: Optional[AsyncCallbackHandler] = None) -> dict[str, Any]:
+    async def ainvoke(
+        self, question: str, streaming_handler: Optional[AsyncCallbackHandler] = None
+    ) -> dict[str, Any]:
         """Invoke the GraphRAG chain.
         
         Args:

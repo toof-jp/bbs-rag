@@ -1,8 +1,6 @@
 """GraphRAG database models."""
 
 import uuid
-from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -30,8 +28,14 @@ class Relationship(Base):
     __tablename__ = "relationships"
 
     relationship_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    source_node_id = Column(UUID(as_uuid=True), ForeignKey("posts.post_id"), nullable=False, index=True)
-    target_node_id = Column(UUID(as_uuid=True), ForeignKey("posts.post_id"), nullable=False, index=True)
-    relationship_type = Column(String(50), nullable=False, index=True)  # IS_REPLY_TO, IS_SEQUENTIAL_TO
+    source_node_id = Column(
+        UUID(as_uuid=True), ForeignKey("posts.post_id"), nullable=False, index=True
+    )
+    target_node_id = Column(
+        UUID(as_uuid=True), ForeignKey("posts.post_id"), nullable=False, index=True
+    )
+    relationship_type = Column(
+        String(50), nullable=False, index=True
+    )  # IS_REPLY_TO, IS_SEQUENTIAL_TO
     properties = Column(JSONB, default={})  # Additional properties like confidence score
     created_at = Column(DateTime(timezone=True), server_default=func.now())
