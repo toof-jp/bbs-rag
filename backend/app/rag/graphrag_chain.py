@@ -69,7 +69,7 @@ class GraphRAGChain:
         logger.info(f"Vector retrieval for question: {state['question']}")
 
         # Import Chroma here to avoid circular imports
-        from langchain_community.vectorstores import Chroma
+        from langchain_chroma import Chroma
 
         # Initialize Chroma vector store
         vectorstore = Chroma(

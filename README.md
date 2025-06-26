@@ -79,7 +79,7 @@ GraphRAGシステムは3段階のセットアップが必要です：
 cd backend
 
 # RAGデータベースのテーブルを作成
-python scripts/init_rag_db.py
+uv run python scripts/init_rag_db.py
 ```
 
 #### 2. データの同期
@@ -88,10 +88,10 @@ python scripts/init_rag_db.py
 
 ```bash
 # 初回フル同期を実行（全ての投稿を同期）
-python scripts/sync_data.py --initial
+uv run python scripts/sync_data.py --initial
 
 # または、継続的な同期を開始（本番環境用）
-python scripts/sync_data.py --interval 60  # 60秒ごとに新規投稿をチェック
+uv run python scripts/sync_data.py --interval 60  # 60秒ごとに新規投稿をチェック
 ```
 
 オプション：
@@ -104,7 +104,7 @@ python scripts/sync_data.py --interval 60  # 60秒ごとに新規投稿をチェ
 RAG DB内の投稿からベクトルインデックスを作成：
 
 ```bash
-python scripts/create_graphrag_index.py
+uv run python scripts/create_graphrag_index.py
 ```
 
 **注意**: 必ず上記の順番でセットアップを実行してください。データ同期により知識グラフ（IS_REPLY_TO、IS_SEQUENTIAL_TO関係）が構築され、GraphRAGシステムが高度な文脈理解を実現します。

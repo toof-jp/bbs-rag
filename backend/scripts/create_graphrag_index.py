@@ -8,10 +8,10 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.core.database import get_rag_db
@@ -41,7 +41,7 @@ async def create_index(batch_size: int = 100) -> None:
 
     with get_rag_db() as session:
         # Get total count
-        total_count = session.execute(select(Post).count()).scalar() or 0
+        total_count = session.execute(select(func.count()).select_from(Post)).scalar() or 0
 
         if total_count == 0:
             print("❌ No posts found in RAG database. Run sync pipeline first.")
