@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     """Application settings."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file="../.env",  # Read from project root
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
@@ -30,6 +30,10 @@ class Settings(BaseSettings):
 
     # CORS
     backend_cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    
+    # Backend server settings
+    backend_host: str = "0.0.0.0"
+    backend_port: int = 8000
 
     # Model settings
     embedding_model: str = "text-embedding-3-small"

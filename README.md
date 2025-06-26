@@ -23,9 +23,9 @@
 
 ### 環境変数の設定
 
-1. `backend/.env`ファイルを作成:
+1. プロジェクトルートに`.env`ファイルを作成:
 ```bash
-cp backend/.env.example backend/.env
+cp .env.example .env
 ```
 
 2. 必要な環境変数を設定:
@@ -36,24 +36,27 @@ DATABASE_URL=postgresql://user:password@localhost:5432/bbs2
 # OpenAI APIキー
 OPENAI_API_KEY=sk-your-api-key
 
-# OpenAIモデル設定（オプション - デフォルトはコスト効率重視）
-# 利用可能なモデル:
-# - gpt-4o: $0.0081/質問 (最高品質)
-# - gpt-4o-mini: $0.0005/質問 (推奨 - バランス重視)
-# - gpt-3.5-turbo: $0.0015/質問 (最安 - テスト向け)
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
-
 # ベクトルストア設定
 COLLECTION_NAME=bbs_rag_collection
+
+# Backend設定
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+
+# Frontend設定（開発用）
+VITE_API_URL=http://localhost:8000
+
+# API CORS設定
+BACKEND_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
+
+**注意**: `.env`ファイルはプロジェクトルートに配置してください。backendとfrontendの両方がこのファイルを参照します。
 
 ### Dockerでの起動
 
 ```bash
-# .envファイルを作成（Docker Compose用）
-cp .env.example .env
-# .envファイルを編集してOPENAI_API_KEYを設定
+# .envファイルが作成済みであることを確認
+# （環境変数の設定セクションで作成済み）
 
 # コンテナの起動
 docker-compose up -d

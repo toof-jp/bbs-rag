@@ -26,7 +26,7 @@ export const ChatInterface: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/v1/ask', {
+      const response = await fetch('/api/v1/ask', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

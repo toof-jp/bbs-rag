@@ -128,12 +128,35 @@ frontend/
 
 ## Environment Variables
 
-Create `.env` file in backend directory:
+Create `.env` file in the project root directory (not in backend/):
+```bash
+# Copy from .env.example
+cp .env.example .env
 ```
+
+Edit `.env` with your values:
+```
+# PostgreSQL Database
 DATABASE_URL=postgresql://user:password@localhost:5432/bbs2
+
+# OpenAI API
 OPENAI_API_KEY=sk-...
+
+# Vector Store
 COLLECTION_NAME=bbs_rag_collection
+
+# Backend Settings
+BACKEND_HOST=0.0.0.0
+BACKEND_PORT=8000
+
+# Frontend Settings (for development)
+VITE_API_URL=http://localhost:8000
+
+# API CORS Origins (comma-separated)
+BACKEND_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 ```
+
+**Important**: The `.env` file should be placed in the project root directory, not in the backend or frontend subdirectories. Both backend and frontend are configured to read from the root `.env` file.
 
 ## Development Workflow
 
