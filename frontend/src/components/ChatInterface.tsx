@@ -56,7 +56,7 @@ export const ChatInterface: React.FC = () => {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               const data = line.substring(6);
-              if (data) {
+              if (data && data.trim() !== '') {
                 try {
                   const parsed = JSON.parse(data);
                   
@@ -65,7 +65,7 @@ export const ChatInterface: React.FC = () => {
                     break;
                   } else if (parsed.type === 'error') {
                     throw new Error(parsed.message);
-                  } else if (parsed.token) {
+                  } else if (parsed.type === 'token' && parsed.token !== undefined) {
                     aiResponse += parsed.token;
                     // Update the last message
                     setMessages(prev => {

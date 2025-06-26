@@ -35,13 +35,13 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
             logger.debug(f"Received token {token_count}: {token[:20] if len(token) > 20 else token}")
             # Format as SSE event
             event_data = StreamToken(token=token).model_dump_json()
-            yield f"data: {event_data}\n\n"
+            yield f"{event_data}"
 
         logger.info(f"Streaming completed. Total tokens: {token_count}")
         
         # Send completion event
         completion_data = json.dumps({"type": "complete"})
-        yield f"data: {completion_data}\n\n"
+        yield f"{completion_data}"
 
     except Exception as e:
         # Log the full error
@@ -50,7 +50,7 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
         traceback.print_exc()
         # Send error event
         error_data = json.dumps({"type": "error", "message": str(e)})
-        yield f"data: {error_data}\n\n"
+        yield f"{error_data}"
 
 
 @router.post("/ask")
