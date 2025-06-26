@@ -1,10 +1,24 @@
 """Main FastAPI application."""
 
+import logging
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.endpoints import chat
 from app.core.config import settings
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout
+)
+
+# Set specific loggers to DEBUG
+logging.getLogger("app.api.endpoints.chat").setLevel(logging.DEBUG)
+logging.getLogger("app.rag.graphrag_chain").setLevel(logging.DEBUG)
 
 # Create FastAPI app
 app = FastAPI(

@@ -6,6 +6,7 @@ from typing import Any, AsyncIterator, Optional, TypedDict
 from uuid import UUID
 
 from langchain.callbacks.base import AsyncCallbackHandler
+from langchain_core.outputs import LLMResult
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langgraph.graph import END, StateGraph
 from sqlalchemy import select
@@ -16,6 +17,39 @@ from app.models.graph import Post
 from app.rag.graph_traversal import GraphTraverser
 
 logger = logging.getLogger(__name__)
+
+
+class StreamingCallbackHandler(AsyncCallbackHandler):
+    """Callback handler for streaming tokens."""
+
+    def __init__(self):
+        self.queue: asyncio.Queue[str] = asyncio.Queue()
+        self.done = False
+
+    async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+        """Put new token to queue."""
+        logger.debug(f"StreamingCallbackHandler received token: {token[:20] if len(token) > 20 else token}")
+        await self.queue.put(token)
+
+    async def on_llm_end(self, response: LLMResult, **kwargs: Any) -> None:
+        """Mark streaming as done."""
+        self.done = True
+
+    async def on_llm_error(self, error: Exception, **kwargs: Any) -> None:
+        """Handle errors."""
+        logger.error(f"LLM error: {error}")
+        self.done = True
+
+    async def aiter(self) -> AsyncIterator[str]:
+        """Async iterator for tokens."""
+        while not self.done or not self.queue.empty():
+            try:
+                token = await asyncio.wait_for(self.queue.get(), timeout=0.1)
+                yield token
+            except asyncio.TimeoutError:
+                if self.done:
+                    break
+                continue
 
 
 class GraphRAGState(TypedDict):
@@ -149,7 +183,9 @@ class GraphRAGChain:
         # Use streaming handler if provided
         if state.get("streaming_handler"):
             response = await self.llm.ainvoke(
-                messages, config={"callbacks": [state["streaming_handler"]]}
+                messages, 
+                config={"callbacks": [state["streaming_handler"]]},
+                stream=True  # Enable streaming for ChatOpenAI
             )
         else:
             response = await self.llm.ainvoke(messages)
@@ -195,20 +231,29 @@ class GraphRAGChain:
         Yields:
             Tokens of the generated answer
         """
-        # Import here to avoid circular imports
-        from app.rag.chain import StreamingCallbackHandler
+        try:
+            logger.info(f"Starting astream for question: {question}")
+            
+            # Use the StreamingCallbackHandler defined in this file
+            stream_handler = StreamingCallbackHandler()
 
-        stream_handler = StreamingCallbackHandler()
+            # Run the chain asynchronously
+            task = asyncio.create_task(self.ainvoke(question, stream_handler))
 
-        # Run the chain asynchronously
-        task = asyncio.create_task(self.ainvoke(question, stream_handler))
+            # Stream tokens
+            token_count = 0
+            async for token in stream_handler.aiter():
+                token_count += 1
+                logger.debug(f"Yielding token {token_count}: {token[:20] if len(token) > 20 else token}")
+                yield token
 
-        # Stream tokens
-        async for token in stream_handler.aiter():
-            yield token
-
-        # Wait for completion
-        await task
+            # Wait for completion
+            await task
+            logger.info(f"Completed streaming. Total tokens: {token_count}")
+            
+        except Exception as e:
+            logger.error(f"Error in astream: {e}", exc_info=True)
+            raise
 
 
 # Global GraphRAG chain instance

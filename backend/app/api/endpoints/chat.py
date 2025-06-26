@@ -22,18 +22,32 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
     Yields:
         SSE formatted events
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        logger.info(f"generate_stream called with question: {question}")
+        token_count = 0
+        
         # Stream tokens using GraphRAG chain
         async for token in graphrag_chain.astream(question):
+            token_count += 1
+            logger.debug(f"Received token {token_count}: {token[:20] if len(token) > 20 else token}")
             # Format as SSE event
             event_data = StreamToken(token=token).model_dump_json()
             yield f"data: {event_data}\n\n"
 
+        logger.info(f"Streaming completed. Total tokens: {token_count}")
+        
         # Send completion event
         completion_data = json.dumps({"type": "complete"})
         yield f"data: {completion_data}\n\n"
 
     except Exception as e:
+        # Log the full error
+        import traceback
+        logger.error(f"Error in generate_stream: {e}")
+        traceback.print_exc()
         # Send error event
         error_data = json.dumps({"type": "error", "message": str(e)})
         yield f"data: {error_data}\n\n"
