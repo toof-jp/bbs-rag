@@ -17,7 +17,7 @@ class GraphTraverser:
 
     def __init__(self, max_depth: int = 3, max_nodes: int = 50):
         """Initialize the graph traverser.
-        
+
         Args:
             max_depth: Maximum depth for graph traversal
             max_nodes: Maximum number of nodes to collect
@@ -26,18 +26,18 @@ class GraphTraverser:
         self.max_nodes = max_nodes
 
     def get_related_posts_recursive(
-        self, 
-        session: Session, 
-        start_post_ids: list[UUID], 
-        relationship_types: Optional[list[str]] = None
+        self,
+        session: Session,
+        start_post_ids: list[UUID],
+        relationship_types: Optional[list[str]] = None,
     ) -> list[Post]:
         """Get related posts using recursive SQL query.
-        
+
         Args:
             session: Database session
             start_post_ids: Starting post IDs
             relationship_types: Types of relationships to follow (None = all)
-            
+
         Returns:
             List of related posts
         """
@@ -51,7 +51,8 @@ class GraphTraverser:
             rel_filter = f"AND r.relationship_type IN ({types_str})"
 
         # Recursive CTE query to traverse the graph
-        query = text(f"""
+        query = text(
+            f"""
         WITH RECURSIVE graph_traversal AS (
             -- Base case: starting posts
             SELECT 
@@ -97,7 +98,8 @@ class GraphTraverser:
         FROM graph_traversal
         ORDER BY source_post_no
         LIMIT :max_nodes
-        """)
+        """
+        )
 
         result = session.execute(
             query,
@@ -105,7 +107,7 @@ class GraphTraverser:
                 "start_ids": start_post_ids,
                 "max_depth": self.max_depth,
                 "max_nodes": self.max_nodes,
-            }
+            },
         )
 
         posts = []
@@ -124,11 +126,11 @@ class GraphTraverser:
         self, session: Session, start_post_ids: list[UUID]
     ) -> dict[str, Any]:
         """Get full conversation context starting from given posts.
-        
+
         Args:
             session: Database session
             start_post_ids: Starting post IDs
-            
+
         Returns:
             Dictionary containing posts and relationships
         """
@@ -136,35 +138,35 @@ class GraphTraverser:
         reply_posts = self.get_related_posts_recursive(
             session, start_post_ids, ["IS_REPLY_TO"]
         )
-        
+
         # Get sequential context (structural relationships)
         sequential_posts = self.get_related_posts_recursive(
             session, start_post_ids, ["IS_SEQUENTIAL_TO"]
         )
-        
+
         # Combine and deduplicate
         all_post_ids = set()
         all_posts = []
-        
+
         for post in reply_posts + sequential_posts:
             if post.post_id not in all_post_ids:
                 all_post_ids.add(post.post_id)
                 all_posts.append(post)
-        
+
         # Sort by post number
         all_posts.sort(key=lambda p: p.source_post_no)
-        
+
         # Get relationships between these posts
         relationships = []
         if all_post_ids:
             rel_query = select(Relationship).where(
                 and_(
                     Relationship.source_node_id.in_(all_post_ids),
-                    Relationship.target_node_id.in_(all_post_ids)
+                    Relationship.target_node_id.in_(all_post_ids),
                 )
             )
             relationships = list(session.execute(rel_query).scalars().all())
-        
+
         return {
             "posts": all_posts,
             "relationships": relationships,
@@ -173,24 +175,24 @@ class GraphTraverser:
                 "reply_posts": len(reply_posts),
                 "sequential_posts": len(sequential_posts),
                 "total_relationships": len(relationships),
-            }
+            },
         }
 
     def format_context_for_llm(self, context_data: dict[str, Any]) -> str:
         """Format the context data for LLM consumption.
-        
+
         Args:
             context_data: Context data from get_conversation_context
-            
+
         Returns:
             Formatted string for LLM
         """
         posts = context_data["posts"]
         relationships = context_data["relationships"]
-        
+
         # Build post ID to number mapping
         id_to_no = {p.post_id: p.source_post_no for p in posts}
-        
+
         # Format posts
         formatted_posts = []
         for post in posts:
@@ -198,7 +200,7 @@ class GraphTraverser:
                 f"No.{post.source_post_no} ({post.timestamp.strftime('%Y-%m-%d %H:%M:%S')}):\n"
                 f"{post.content}\n"
             )
-        
+
         # Format relationships
         formatted_rels = []
         for rel in relationships:
@@ -207,17 +209,17 @@ class GraphTraverser:
             formatted_rels.append(
                 f"- No.{source_no} {rel.relationship_type} No.{target_no}"
             )
-        
+
         # Combine into final context
         context = "=== CONVERSATION CONTEXT ===\n\n"
         context += "Posts:\n" + "\n---\n".join(formatted_posts)
-        
+
         if formatted_rels:
             context += "\n\n=== RELATIONSHIPS ===\n"
             context += "\n".join(formatted_rels)
-        
+
         context += "\n\n=== STATISTICS ===\n"
         for key, value in context_data["stats"].items():
             context += f"- {key}: {value}\n"
-        
+
         return context

@@ -15,8 +15,12 @@ class Settings(BaseSettings):
     )
 
     # Database connections
-    database_url: str = "postgresql://user:password@localhost:5432/bbs2"  # Source DB (read-only)
-    rag_database_url: str = "postgresql://user:password@localhost:5432/bbs_rag"  # RAG DB
+    database_url: str = (
+        "postgresql://user:password@localhost:5432/bbs2"  # Source DB (read-only)
+    )
+    rag_database_url: str = (
+        "postgresql://user:password@localhost:5432/bbs_rag"  # RAG DB
+    )
 
     # OpenAI
     openai_api_key: SecretStr = SecretStr("")
@@ -36,7 +40,11 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         """Get CORS origins as a list."""
-        return [item.strip() for item in self.backend_cors_origins.split(",") if item.strip()]
+        return [
+            item.strip()
+            for item in self.backend_cors_origins.split(",")
+            if item.strip()
+        ]
 
     # Backend server settings
     backend_host: str = "0.0.0.0"

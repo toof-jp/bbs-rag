@@ -8,7 +8,9 @@ from pydantic import BaseModel, Field
 class QuestionRequest(BaseModel):
     """Request model for asking questions."""
 
-    question: str = Field(..., description="The question to ask about the bulletin board")
+    question: str = Field(
+        ..., description="The question to ask about the bulletin board"
+    )
     conversation_id: Optional[str] = Field(
         None, description="Optional conversation ID for tracking"
     )
@@ -34,4 +36,6 @@ class AnswerResponse(BaseModel):
     """Response model for answers with citations."""
 
     answer: str = Field(..., description="The generated answer")
-    citations: list[CitationPost] = Field(default_factory=list, description="List of cited posts")
+    citations: list[CitationPost] = Field(
+        default_factory=list, description="List of cited posts"
+    )

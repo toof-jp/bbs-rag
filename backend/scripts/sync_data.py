@@ -13,7 +13,9 @@ from app.sync.pipeline import DataSyncPipeline
 
 def main() -> None:
     """Run data sync pipeline."""
-    parser = argparse.ArgumentParser(description="Sync data from source DB to GraphRAG DB")
+    parser = argparse.ArgumentParser(
+        description="Sync data from source DB to GraphRAG DB"
+    )
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -31,11 +33,11 @@ def main() -> None:
         default=60,
         help="Interval between sync runs in seconds (default: 60)",
     )
-    
+
     args = parser.parse_args()
-    
+
     pipeline = DataSyncPipeline()
-    
+
     if args.once:
         print(f"🔄 Running one-time sync with batch size {args.batch_size}...")
         count = pipeline.sync_batch(args.batch_size)

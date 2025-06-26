@@ -20,7 +20,7 @@ from app.models.graph import Post
 
 async def create_index(batch_size: int = 100) -> None:
     """Create vector index from posts in RAG database.
-    
+
     Args:
         batch_size: Number of posts to process in each batch
     """
@@ -41,28 +41,30 @@ async def create_index(batch_size: int = 100) -> None:
 
     with get_rag_db() as session:
         # Get total count
-        total_count = session.execute(
-            select(Post).count()
-        ).scalar() or 0
-        
+        total_count = session.execute(select(Post).count()).scalar() or 0
+
         if total_count == 0:
             print("❌ No posts found in RAG database. Run sync pipeline first.")
             return
-        
+
         print(f"📄 Found {total_count} posts in RAG database")
 
         # Process in batches
         offset = 0
         processed = 0
-        
+
         while offset < total_count:
             # Get batch of posts
-            posts = session.execute(
-                select(Post)
-                .order_by(Post.source_post_no)
-                .limit(batch_size)
-                .offset(offset)
-            ).scalars().all()
+            posts = (
+                session.execute(
+                    select(Post)
+                    .order_by(Post.source_post_no)
+                    .limit(batch_size)
+                    .offset(offset)
+                )
+                .scalars()
+                .all()
+            )
 
             if not posts:
                 break
@@ -77,7 +79,7 @@ async def create_index(batch_size: int = 100) -> None:
                         "source_post_no": post.source_post_no,
                         "timestamp": post.timestamp.isoformat(),
                         "source": f"graphrag_post_{post.source_post_no}",
-                    }
+                    },
                 )
                 documents.append(doc)
 

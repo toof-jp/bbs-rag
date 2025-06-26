@@ -31,33 +31,35 @@ class DataSyncPipeline:
 
     def get_last_processed_no(self, rag_session: Session) -> int:
         """Get the last processed post number from RAG DB."""
-        result = rag_session.execute(
-            select(func.max(Post.source_post_no))
-        ).scalar()
+        result = rag_session.execute(select(func.max(Post.source_post_no))).scalar()
         return result or 0
 
     def extract_new_posts(
         self, source_session: Session, last_no: int, limit: int = 1000
     ) -> list[dict[str, Any]]:
         """Extract new posts from source DB."""
-        query = text("""
+        query = text(
+            """
             SELECT no, name_and_trip, datetime, id, main_text
             FROM public.res
             WHERE no > :last_no
             ORDER BY no ASC
             LIMIT :limit
-        """)
-        
+        """
+        )
+
         result = source_session.execute(query, {"last_no": last_no, "limit": limit})
         posts = []
         for row in result:
-            posts.append({
-                "no": row.no,
-                "name_and_trip": row.name_and_trip,
-                "datetime": row.datetime,
-                "id": row.id,
-                "main_text": row.main_text,
-            })
+            posts.append(
+                {
+                    "no": row.no,
+                    "name_and_trip": row.name_and_trip,
+                    "datetime": row.datetime,
+                    "id": row.id,
+                    "main_text": row.main_text,
+                }
+            )
         return posts
 
     def create_post_node(self, post_data: dict[str, Any]) -> Post:
@@ -73,21 +75,27 @@ class DataSyncPipeline:
     ) -> list[Relationship]:
         """Infer IS_REPLY_TO relationships using LLM."""
         # Get recent posts for context
-        recent_posts = rag_session.execute(
-            select(Post)
-            .where(Post.source_post_no < post.source_post_no)
-            .order_by(Post.source_post_no.desc())
-            .limit(context_window)
-        ).scalars().all()
+        recent_posts = (
+            rag_session.execute(
+                select(Post)
+                .where(Post.source_post_no < post.source_post_no)
+                .order_by(Post.source_post_no.desc())
+                .limit(context_window)
+            )
+            .scalars()
+            .all()
+        )
 
         if not recent_posts:
             return []
 
         # Build context for LLM
-        context = "\n".join([
-            f"No.{p.source_post_no}: {p.content[:200]}..."
-            for p in reversed(recent_posts)
-        ])
+        context = "\n".join(
+            [
+                f"No.{p.source_post_no}: {p.content[:200]}..."
+                for p in reversed(recent_posts)
+            ]
+        )
 
         # Ask LLM to identify reply relationships
         prompt = f"""Given the following conversation context, identify which \
@@ -116,14 +124,14 @@ Example valid responses: "123,145" or "NONE"
                     target_post = rag_session.execute(
                         select(Post).where(Post.source_post_no == reply_no)
                     ).scalar_one_or_none()
-                    
+
                     if target_post:
                         relationships.append(
                             Relationship(
                                 source_node_id=post.post_id,
                                 target_node_id=target_post.post_id,
                                 relationship_type="IS_REPLY_TO",
-                                properties={"confidence": 0.8}
+                                properties={"confidence": 0.8},
                             )
                         )
             except (ValueError, AttributeError) as e:
@@ -132,35 +140,41 @@ Example valid responses: "123,145" or "NONE"
         return relationships
 
     def create_sequential_relationships(
-        self, post: Post, source_session: Session, rag_session: Session, window_size: int = 20
+        self,
+        post: Post,
+        source_session: Session,
+        rag_session: Session,
+        window_size: int = 20,
     ) -> list[Relationship]:
         """Create IS_SEQUENTIAL_TO relationships for subsequent posts."""
         # Get subsequent posts from source DB
-        query = text("""
+        query = text(
+            """
             SELECT no FROM public.res
             WHERE no > :current_no
             ORDER BY no ASC
             LIMIT :limit
-        """)
-        
+        """
+        )
+
         result = source_session.execute(
             query, {"current_no": post.source_post_no, "limit": window_size}
         )
-        
+
         relationships = []
         for row in result:
             # Check if the subsequent post exists in RAG DB
             target_post = rag_session.execute(
                 select(Post).where(Post.source_post_no == row.no)
             ).scalar_one_or_none()
-            
+
             if target_post:
                 relationships.append(
                     Relationship(
                         source_node_id=post.post_id,
                         target_node_id=target_post.post_id,
                         relationship_type="IS_SEQUENTIAL_TO",
-                        properties={"distance": row.no - post.source_post_no}
+                        properties={"distance": row.no - post.source_post_no},
                     )
                 )
 
@@ -197,14 +211,18 @@ Example valid responses: "123,145" or "NONE"
                         rag_db.add(rel)
 
                     # Create sequential relationships
-                    seq_rels = self.create_sequential_relationships(post, source_db, rag_db)
+                    seq_rels = self.create_sequential_relationships(
+                        post, source_db, rag_db
+                    )
                     for rel in seq_rels:
                         rag_db.add(rel)
 
                     processed_count += 1
 
                     if processed_count % 10 == 0:
-                        logger.info(f"Processed {processed_count}/{len(new_posts)} posts")
+                        logger.info(
+                            f"Processed {processed_count}/{len(new_posts)} posts"
+                        )
 
                 except Exception as e:
                     logger.error(f"Error processing post No.{post_data['no']}: {e}")
@@ -217,7 +235,9 @@ Example valid responses: "123,145" or "NONE"
 
         return processed_count
 
-    def run_continuous_sync(self, batch_size: int = 100, interval_seconds: int = 60) -> None:
+    def run_continuous_sync(
+        self, batch_size: int = 100, interval_seconds: int = 60
+    ) -> None:
         """Run continuous synchronization."""
         import time
 
@@ -225,12 +245,14 @@ Example valid responses: "123,145" or "NONE"
             f"Starting continuous sync with batch_size={batch_size}, "
             f"interval={interval_seconds}s"
         )
-        
+
         while True:
             try:
                 count = self.sync_batch(batch_size)
                 if count == 0:
-                    logger.info(f"No new data. Sleeping for {interval_seconds} seconds...")
+                    logger.info(
+                        f"No new data. Sleeping for {interval_seconds} seconds..."
+                    )
                 time.sleep(interval_seconds)
             except KeyboardInterrupt:
                 logger.info("Sync interrupted by user")

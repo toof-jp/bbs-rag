@@ -37,5 +37,7 @@ class Relationship(Base):
     relationship_type = Column(
         String(50), nullable=False, index=True
     )  # IS_REPLY_TO, IS_SEQUENTIAL_TO
-    properties = Column(JSONB, default={})  # Additional properties like confidence score
+    properties = Column(
+        JSONB, default={}
+    )  # Additional properties like confidence score
     created_at = Column(DateTime(timezone=True), server_default=func.now())

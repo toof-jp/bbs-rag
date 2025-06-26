@@ -13,7 +13,7 @@ from app.core.database import init_rag_db
 def main() -> None:
     """Initialize RAG database."""
     print("🔧 Initializing RAG database tables...")
-    
+
     try:
         init_rag_db()
         print("✅ RAG database initialized successfully!")
