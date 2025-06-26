@@ -11,10 +11,12 @@ class Settings(BaseSettings):
         env_file="../.env",  # Read from project root
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",  # Ignore extra fields from .env
     )
 
-    # Database
-    database_url: str = "postgresql://user:password@localhost:5432/bbs2"
+    # Database connections
+    database_url: str = "postgresql://user:password@localhost:5432/bbs2"  # Source DB (read-only)
+    rag_database_url: str = "postgresql://user:password@localhost:5432/bbs_rag"  # RAG DB
 
     # OpenAI
     openai_api_key: SecretStr = SecretStr("")
@@ -29,7 +31,12 @@ class Settings(BaseSettings):
     project_version: str = "0.1.0"
 
     # CORS
-    backend_cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    backend_cors_origins: str = "http://localhost:5173,http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Get CORS origins as a list."""
+        return [item.strip() for item in self.backend_cors_origins.split(",") if item.strip()]
 
     # Backend server settings
     backend_host: str = "0.0.0.0"

@@ -83,9 +83,16 @@ async def create_index(incremental: bool = False) -> None:
     batch_size = 10
     for i in range(0, len(windows), batch_size):
         batch = windows[i : i + batch_size]
-        retriever.add_documents(batch)
-        progress = min(i + batch_size, len(windows))
-        print(f"   Progress: {progress}/{len(windows)} windows indexed")
+        try:
+            # Use the vectorstore directly for adding parent documents
+            retriever.vectorstore.add_documents(batch)
+            progress = min(i + batch_size, len(windows))
+            print(f"   Progress: {progress}/{len(windows)} windows indexed")
+        except Exception as e:
+            print(f"Error adding batch {i//batch_size + 1}: {e}")
+            # Try alternative approach
+            for doc in batch:
+                retriever.vectorstore.add_documents([doc])
 
     # Update metadata
     if documents:

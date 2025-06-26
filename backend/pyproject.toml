@@ -12,8 +12,10 @@ dependencies = [
     "langchain>=0.2.0",
     "langchain-community>=0.2.0",
     "langchain-openai>=0.1.0",
+    "langgraph>=0.2.0",
     "chromadb>=0.5.0",
     "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
     "python-dotenv>=1.0.0",
     "sse-starlette>=2.0.0",
 ]
@@ -26,6 +28,7 @@ dev = [
     "black>=24.0.0",
     "mypy>=1.10.0",
     "types-psycopg2",
+    "types-sqlalchemy",
 ]
 
 [build-system]

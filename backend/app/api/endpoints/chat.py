@@ -6,7 +6,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
-from app.rag.chain import rag_chain
+from app.rag.graphrag_chain import graphrag_chain
 from app.rag.schemas import QuestionRequest, StreamToken
 
 router = APIRouter()
@@ -17,14 +17,14 @@ async def generate_stream(question: str, conversation_id: str) -> AsyncGenerator
 
     Args:
         question: The question to answer
-        conversation_id: Conversation ID for tracking
+        conversation_id: Conversation ID for tracking (not used in GraphRAG)
 
     Yields:
         SSE formatted events
     """
     try:
-        # Stream tokens
-        async for token in rag_chain.astream(question, conversation_id):
+        # Stream tokens using GraphRAG chain
+        async for token in graphrag_chain.astream(question):
             # Format as SSE event
             event_data = StreamToken(token=token).model_dump_json()
             yield f"data: {event_data}\n\n"

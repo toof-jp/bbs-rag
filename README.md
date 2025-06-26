@@ -71,6 +71,7 @@ docker-compose logs -f
 
 ```bash
 cd backend
+
 # 仮想環境を有効化している場合
 python scripts/create_index.py
 

@@ -29,10 +29,26 @@ format:
 test:
 	uv run pytest
 
-# Create vector index
+# Create vector index (old sliding window approach)
 create-index:
 	uv run python scripts/create_index.py
+
+# Create GraphRAG vector index
+create-graphrag-index:
+	uv run python scripts/create_graphrag_index.py
 
 # Update vector index (incremental)
 update-index:
 	uv run python scripts/update_index.py
+
+# Initialize RAG database
+init-db:
+	uv run python scripts/init_rag_db.py
+
+# Run data sync pipeline (once)
+sync-once:
+	uv run python scripts/sync_data.py --once
+
+# Run continuous data sync
+sync:
+	uv run python scripts/sync_data.py
