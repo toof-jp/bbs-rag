@@ -90,8 +90,8 @@ class DataSyncPipeline:
         ])
 
         # Ask LLM to identify reply relationships
-        prompt = f"""Given the following conversation context, identify which post numbers (if any) \
-the new post No.{post.source_post_no} is replying to.
+        prompt = f"""Given the following conversation context, identify which \
+post numbers (if any) the new post No.{post.source_post_no} is replying to.
 
 Context:
 {context}
