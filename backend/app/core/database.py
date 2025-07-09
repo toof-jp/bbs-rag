@@ -1,39 +1,45 @@
-from collections.abc import AsyncIterator, Iterator
+"""Database connection management."""
 
-import asyncpg
+from contextlib import contextmanager
+from typing import Generator
+
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 
-# postgres:// を postgresql:// に変換（SQLAlchemy 1.4+ 対応）
-database_url = settings.DATABASE_URL
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+# Engine for source database (read-only)
+source_engine = create_engine(settings.database_url, pool_pre_ping=True)
+SourceSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=source_engine)
 
-# 同期用エンジン（インデックス作成など）
-engine = create_engine(database_url)
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-Base = declarative_base()
+# Engine for RAG database
+rag_engine = create_engine(settings.rag_database_url, pool_pre_ping=True)
+RagSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=rag_engine)
 
 
-# 非同期データベース接続
-async def get_async_db_connection() -> AsyncIterator[asyncpg.Connection]:
-    """非同期でデータベース接続を取得"""
-    conn = await asyncpg.connect(database_url)
-    try:
-        yield conn
-    finally:
-        await conn.close()
-
-
-def get_db() -> Iterator[Session]:
-    """同期的なデータベースセッションを取得"""
-    db = SessionLocal()
+@contextmanager
+def get_source_db() -> Generator[Session, None, None]:
+    """Get source database session (read-only)."""
+    db = SourceSessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+
+@contextmanager
+def get_rag_db() -> Generator[Session, None, None]:
+    """Get RAG database session."""
+    db = RagSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_rag_db() -> None:
+    """Initialize RAG database tables."""
+    from app.models.base import Base
+    from app.models.graph import Post, Relationship  # noqa: F401
+
+    Base.metadata.create_all(bind=rag_engine)

@@ -1,5 +1,7 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+"""Main FastAPI application."""
+
+import logging
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,37 +9,52 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.endpoints import chat
 from app.core.config import settings
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    # スタートアップ時の処理
-    print("Starting up BBS RAG API...")
-    yield
-    # シャットダウン時の処理
-    print("Shutting down...")
-
-
-app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan,
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stdout
 )
 
-# CORS設定
+# Set specific loggers to DEBUG
+logging.getLogger("app.api.endpoints.chat").setLevel(logging.DEBUG)
+logging.getLogger("app.rag.graphrag_chain").setLevel(logging.DEBUG)
+
+# Create FastAPI app
+app = FastAPI(
+    title=settings.project_name,
+    version=settings.project_version,
+    openapi_url=f"{settings.api_v1_str}/openapi.json",
+)
+
+# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Include routers
+app.include_router(
+    chat.router,
+    prefix=f"{settings.api_v1_str}",
+    tags=["chat"],
+)
 
-# ルートエンドポイント
+
 @app.get("/")
-def read_root() -> dict[str, str]:
-    return {"message": "Welcome to BBS RAG API", "docs": "/docs"}
+async def root() -> dict[str, str]:
+    """Root endpoint."""
+    return {
+        "message": "BBS RAG API",
+        "version": settings.project_version,
+        "docs": "/docs",
+    }
 
 
-# APIルーターの登録
-app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """Health check endpoint."""
+    return {"status": "healthy"}

@@ -1,43 +1,54 @@
-.PHONY: help install install-dev run format lint type-check test clean
+.PHONY: install dev lint test create-index update-index
 
-help:
-	@echo "Available commands:"
-	@echo "  make install      - Install production dependencies"
-	@echo "  make install-dev  - Install all dependencies including dev"
-	@echo "  make run          - Run the development server"
-	@echo "  make format       - Format code with black and ruff"
-	@echo "  make lint         - Run linting checks"
-	@echo "  make type-check   - Run type checking with mypy"
-	@echo "  make test         - Run tests"
-	@echo "  make clean        - Clean up cache files"
-
+# Install dependencies using uv
 install:
+	uv venv
 	uv pip install -e .
 
+# Install dev dependencies
 install-dev:
+	uv venv
 	uv pip install -e ".[dev]"
 
-run:
-	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Run development server
+dev:
+	uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-format:
-	black .
-	ruff check --fix .
-
+# Run linting
 lint:
-	ruff check .
-	black --check .
+	uv run ruff check .
+	uv run black --check .
+	uv run mypy .
 
-type-check:
-	mypy .
+# Format code
+format:
+	uv run ruff check --fix .
+	uv run black .
 
+# Run tests
 test:
-	pytest
+	uv run pytest
 
-clean:
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	find . -type d -name ".mypy_cache" -exec rm -rf {} +
-	find . -type d -name ".ruff_cache" -exec rm -rf {} +
+# Create vector index (old sliding window approach)
+create-index:
+	uv run python scripts/create_index.py
+
+# Create GraphRAG vector index
+create-graphrag-index:
+	uv run python scripts/create_graphrag_index.py
+
+# Update vector index (incremental)
+update-index:
+	uv run python scripts/update_index.py
+
+# Initialize RAG database
+init-db:
+	uv run python scripts/init_rag_db.py
+
+# Run data sync pipeline (once)
+sync-once:
+	uv run python scripts/sync_data.py --once
+
+# Run continuous data sync
+sync:
+	uv run python scripts/sync_data.py

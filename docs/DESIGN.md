@@ -1,312 +1,152 @@
-# 掲示板RAGアプリケーション設計書
+# 実装設計書：GraphRAGを用いたアンカー機能が少ない掲示板の文脈理解とリアルタイムQ&Aシステム（分離システム版）
 
-## 1\. はじめに
+## 第1部：システムアーキテクチャ
 
-### 1.1. 目的
+本設計は、既存の掲示板システムを**読み取り専用のデータソース**として扱い、完全に独立したRAG（Retrieval-Augmented Generation）システムを構築することを目的とします。既存システムへの書き込みや変更は一切行いません。
 
-本ドキュメントは、LangChainを利用して掲示板の過去ログを対象としたRetrieval Augmented Generation (RAG) アプリケーションを開発するための実装設計を定義する。ユーザーは自然言語で質問を投げかけることで、掲示板の文脈を理解した回答をリアルタイムで得ることができる。
+### 1.1. システム構成要素
 
-### 1.2. 背景
+システムは、明確に分離された2つの領域で構成されます。
 
-アンカー機能（特定のレスへの返信機能）があまり使用されていない掲示板では、単純なキーワード検索では会話の流れや文脈を把握することが困難である。本システムでは、RAG技術、特にレスの前後の関係性を考慮した検索手法を用いることで、この課題を解決する。
+1.  **既存システム（読み取り専用）**:
+    *   **掲示板クローラー**: 継続的に掲示板からレスを収集する外部プログラム（変更対象外）。
+    *   **掲示板データベース (PostgreSQL)**: クローラーによって収集されたレスの生データを格納するデータベース（変更対象外）。
 
-### 1.3. 設計方針
+2.  **新規RAGシステム**:
+    *   **データ同期・グラフ構築パイプライン**: 既存の掲示板DBからデータを定期的に読み込み、RAGシステム用のナレッジグラフとベクトルデータを構築・更新するバッチプロセス。
+    *   **RAG用PostgreSQLデータベース**: 同期パイプラインによって生成された**ナレッジグラフ（ノードと関係性）**を格納するための専用データベース。
+    *   **ChromaDBベクターストア**: レスの埋め込みベクトルを格納し、高速な類似度検索を提供する専用のベクトルデータベース。
+    *   **FastAPIバックエンド（リアルタイムAPI）**: ユーザーからの質問を受け付け、RAG用のDBとChromaDBを利用して回答を生成するAPIサーバー。
+    *   **Reactフロントエンド（インタラクティブUI）**: ユーザーが質問を入力し、リアルタイムで回答を受け取るためのWebインターフェース。
 
-  - **コンポーネントベース:** フロントエンド、バックエンド、データベース、RAGパイプラインを疎結合なコンポーネントとして設計し、拡張性とメンテナンス性を確保する。
-  - **リアルタイム応答:** サーバーサイドイベント (SSE) を利用したストリーミング通信により、LLMの生成する回答をリアルタイムでフロントエンドに表示し、高いUXを実現する。
-  - **型安全な開発:** OpenAPIによるAPI仕様の定義と、それに基づくクライアントコードの自動生成により、フロントエンドとバックエンド間の連携を型安全に進める。
-  - **段階的実装:** まずは中核となるRAGパイプラインを構築し、その後、より高度な検索手法（Graph RAGなど）への拡張も視野に入れた設計とする。
+### 1.2. データフロー
 
-## 2\. システムアーキテクチャ
+データは一方向に流れます。
 
-### 2.1. 全体構成図
+1.  **オフライン（バッチ処理）**:
+    *   データ同期パイプラインが、既存の掲示板DBに接続し、新しいレスを読み取ります。
+    *   読み取ったレスの本文から、LLMを用いて意味的な関係性（返信など）を推論します。
+    *   各レスに対して、後続20件のレスへの構造的な関係性を付与します。
+    *   生成されたグラフデータ（ノード、関係性）をRAG用PostgreSQLに保存します。
+    *   レス本文の埋め込みベクトルを生成し、ChromaDBに保存します。
 
-```mermaid
-graph TD
-    subgraph Browser
-        A[Frontend (React/Vite)]
-    end
+2.  **オンライン（リアルタイム処理）**:
+    *   ユーザーがReactフロントエンドから質問を送信します。
+    *   FastAPIバックエンドがリクエストを受け取ります。
+    *   バックエンドは、**ChromaDB**にベクトル検索を、**RAG用PostgreSQL**にグラフ探索をクエリします。**（既存の掲示板DBにはアクセスしません）**
+    *   取得した文脈情報を基にLLMが回答を生成し、フロントエンドにストリーミングで返します。
 
-    subgraph Server
-        B[Backend (FastAPI/Python)]
-        C[RAG Pipeline (LangChain)]
-        D[Vector Store (PGVector)]
-        E[Database (PostgreSQL)]
-    end
+このアーキテクチャにより、リアルタイムのQ&A処理が既存のデータベースに負荷をかけることなく、RAGシステム内で完結し、高いパフォーマンスと独立性を確保します。
 
-    subgraph External Services
-        F[LLM API (e.g., OpenAI)]
-    end
+---
 
-    A -- HTTP/REST (OpenAPI) --> B
-    B -- Ask Query --> C
-    C -- Retrieve --> D
-    C -- Load Context --> E
-    C -- Generate --> F
-    F -- Stream Tokens --> C
-    C -- Stream Response --> B
-    B -- SSE (Streaming) --> A
-```
+## 第2部：データ層の設計
 
-### 2.2. 技術スタック
+### 2.1. 外部データソース（読み取り専用）
 
-| 領域 | 技術 | 役割・選定理由 |
+RAGシステムのデータソースとして、以下のスキーマを持つ既存の掲示板データベースの`res`テーブルを読み取り専用で利用します。
+
+**表1：既存の掲示板データベーススキーマ（ソース）**
+
+| カラム名 | データ型 | 説明 |
 | :--- | :--- | :--- |
-| **Frontend** | Vite, React, TypeScript | 高速な開発サイクルと型安全性を持つモダンなSPA開発環境。 |
-| **Backend** | Python, FastAPI, Uvicorn | Pythonの豊富なAI/MLライブラリ資産を活用でき、高速な非同期APIサーバーを容易に構築可能。 |
-| **AI/RAG** | LangChain | RAGパイプラインの構築を効率化するフレームワーク。 |
-| **Database** | PostgreSQL | 堅牢なリレーショナルデータベース。掲示板データの保存用。 |
-| **Vector Store** | Chroma | 高速なローカルベクトルデータベース。追加のインフラ不要で、開発・運用が簡単。 |
-| **LLM** | OpenAI API (GPT-4oなど) | (選択可能) 高性能な言語モデル。ストリーミング応答に対応。 |
-| **API仕様** | OpenAPI 3.0 | APIスキーマの標準的な定義方法。各種ツールとの連携が容易。 |
+| `no` | `integer` | レス番号（主キー） |
+| `name_and_trip` | `text` | 名前とトリップ |
+| `datetime` | `timestamp without time zone` | 投稿日時 |
+| `datetime_text` | `text` | 投稿日時のテキスト表現 |
+| `id` | `text` | ユーザーID |
+| `main_text` | `text` | レス本文 |
+| `main_text_html` | `text` | レス本文（HTML） |
+| `oekaki_id` | `integer` | お絵かきID |
 
-## 3\. データベース設計
+### 2.2. RAGシステム内部のデータストア
 
-### 3.1. 使用データベース
+RAGシステムは、リアルタイム検索とグラフ探索のために、独自の最適化されたデータストアを保持します。
 
-  - **プライマリDB:** PostgreSQL
-  - **ベクトルストア:** Chroma (ローカルファイルベース)
+#### 2.2.1. RAG用PostgreSQL（グラフストア）
 
-### 3.2. スキーマ定義
+LLMやルールによって生成されたグラフ構造を格納します。この独自のデータベースを持つことで、元のデータ構造を変更することなく、複雑な関係性を自由にモデル化できます。
 
-提供されたスキーマをそのまま利用する。
+**表2：RAG用PostgreSQLデータベーススキーマ**
 
-**Table: `public.res`**
+| テーブル名 | カラム名 | データ型 | 説明 |
+| :--- | :--- | :--- | :--- |
+| **posts** | `post_id` | `UUID` | 投稿の一意なID（PK） |
+| | `source_post_no` | `INTEGER` | 既存DBの`res.no`に対応するレス番号 |
+| | `content` | `TEXT` | 投稿の本文 |
+| | `timestamp` | `TIMESTAMPTZ` | 投稿日時 |
+| **relationships** | `relationship_id` | `UUID` | リレーションシップの一意なID（PK） |
+| | `source_node_id` | `UUID` | 関係の始点となる投稿のID |
+| | `target_node_id` | `UUID` | 関係の終点となる投稿のID |
+| | `relationship_type` | `TEXT` | 関係のタイプ（'IS_REPLY_TO', 'IS_SEQUENTIAL_TO'など） |
+| | `properties` | `JSONB` | 関係の追加プロパティ（信頼度スコアなど） |
 
-```sql
-CREATE TABLE public.res (
-    no integer NOT NULL DEFAULT nextval('res_no_seq'::regclass),
-    name_and_trip text NOT NULL,
-    datetime timestamp without time zone NOT NULL,
-    datetime_text text NOT NULL,
-    id text NOT NULL,
-    main_text text NOT NULL,
-    main_text_html text NOT NULL,
-    oekaki_id integer,
-    CONSTRAINT res_pkey PRIMARY KEY (no)
-);
-```
+#### 2.2.2. ChromaDB（ベクトルストア）
 
-### 3.3. ベクトルストアのデータ構造
+投稿本文のセマンティックな意味を捉えた埋め込みベクトルを格納します。独立したサービスとして実行され、高速な類似度検索を担当します。
 
-Chromaに格納するドキュメントの構造は以下の通り。
+---
 
-  - **`page_content`**: 埋め込み対象となるテキスト。主にレス本文 (`main_text`) を格納する。
-  - **`metadata`**: 検索や文脈再構築に利用する付加情報。
-    ```json
-    {
-      "no": 123,
-      "id": "abcdefg",
-      "datetime": "2024-01-01T12:00:00",
-      "name_and_trip": "名無しさん◆trip",
-      "source": "res_no_123"
-    }
-    ```
-  - **保存場所**: `backend/chroma_db/` ディレクトリに永続化される。
+## 第3部：データ同期・グラフ構築パイプライン
 
-## 4\. バックエンド設計 (FastAPI)
+このパイプラインは、既存のDBからRAGシステムへデータを変換・転送するETL（Extract, Transform, Load）プロセスです。
 
-### 4.1. ディレクトリ構成
+### 3.1. パイプラインの処理フロー
 
-```
-backend/
-├── app/
-│   ├── api/
-│   │   ├── __init__.py
-│   │   └── endpoints/
-│   │       ├── __init__.py
-│   │       └── chat.py        # /ask エンドポイント
-│   ├── core/
-│   │   ├── __init__.py
-│   │   └── config.py        # 環境変数読み込み
-│   ├── rag/
-│   │   ├── __init__.py
-│   │   ├── chain.py         # RAGチェーンの定義
-│   │   ├── loader.py        # カスタムDocument Loader
-│   │   ├── retriever.py     # Retrieverの定義
-│   │   └── schemas.py       # データ構造定義 (Pydantic)
-│   └── __init__.py
-│   └── main.py            # FastAPIアプリケーションのエントリポイント
-├── scripts/
-│   └── create_index.py      # インデックス作成用バッチスクリプト
-├── .env                     # 環境変数ファイル
-├── Dockerfile
-└── requirements.txt
-```
+定期的に（例：cronジョブで10分ごとに）実行されるPythonスクリプトとして実装します。
 
-### 4.2. APIエンドポイント定義 (OpenAPI)
+1.  **差分抽出 (Extract)**:
+    *   RAG用PostgreSQLに記録されている、最後に処理したレスの`no`（`source_post_no`）を取得します。
+    *   既存の掲示板DBに接続し、その`no`よりも大きいすべての新しいレスを取得します。
 
-FastAPIが自動生成するOpenAPI仕様。ここでは主要なエンドポイントの定義を示す。
+2.  **変換とグラフ構築 (Transform)**:
+    *   取得した各レスに対して、以下の処理を行います。
+        *   **ノード生成**: RAG用DBの`posts`テーブルに新しいレコードを作成します。
+        *   **ベクトル生成**: `main_text`から埋め込みベクトルを生成します。
+        *   **意味的エッジ推論**: `main_text`をLLMに渡し、先行するレスへの`IS_REPLY_TO`関係を推論させます。
+        *   **構造的エッジ生成**: 既存の掲示板DBに対して`SELECT * FROM res WHERE no > {current_no} ORDER BY no ASC LIMIT 20`のようなクエリを実行し、後続20件のレスを取得します。取得したレスそれぞれに対して、`IS_SEQUENTIAL_TO`という関係性のエッジを生成します。
 
-**`POST /api/v1/ask`**
+3.  **書き込み (Load)**:
+    *   **グラフデータ**: 生成されたノード（投稿）とエッジ（関係性）の情報を、RAG用PostgreSQLに一括で書き込みます。
+    *   **ベクトルデータ**: 生成された埋め込みベクトルと、対応する`post_id`をメタデータとしてChromaDBに書き込みます。
 
-  - **Summary:** 掲示板の内容に関する質問を受け付け、ストリーミングで回答を返す。
-  - **Request Body:**
-    ```json
-    {
-      "question": "string",
-      "conversation_id": "string (optional)"
-    }
-    ```
-  - **Responses:**
-      - **`200 OK`**:
-          - **Content-Type:** `text/event-stream`
-          - **Description:** サーバーサイドイベント (SSE) 形式で回答のトークンをストリーミングする。
+---
 
-### 4.3. RAGパイプライン設計 (LangChain)
+## 第4部：リアルタイムQ&Aバックエンドサービス (FastAPI)
 
-#### 4.3.1. フェーズ1: インデックス作成 (バッチ処理)
+ユーザーからのリクエストを処理するAPIサーバーです。
 
-`scripts/create_index.py` として実装。
+### 4.1. GraphRAG検索ワークフロー（LangGraph）
 
-1.  **データローダー (`rag/loader.py`)**:
-      - `psycopg2` を用いてPostgreSQLに接続し、`res`テーブルからデータを取得する`PostgresResLoader`を`BaseLoader`を継承して実装する。
-2.  **テキスト分割/チャンキング戦略**:
-      - **スライディングウィンドウ方式** を採用する。
-      - **親ドキュメント**: 50レスを1ウィンドウとし、20レスずつ重複させながらスライド。これによりどこで区切っても文脈が保持される。
-      - **子ドキュメント**: `ParentDocumentRetriever`により親ドキュメントをさらに400文字ごとに分割。
-      - **出典特定**: 検索後、GPT-3.5-turboを使用して関連する具体的なレス番号を抽出。
-3.  **埋め込みモデル**:
-      - OpenAIの`text-embedding-3-small`など、コストと性能のバランスが良いモデルを選定する。
-4.  **ベクトルストアへの格納**:
-      - `langchain_community.vectorstores.Chroma` を使用。
-      - 親ドキュメントと子ドキュメントを適切に設定し、`ParentDocumentRetriever`の`add_documents`メソッドを使用してインデックスを構築する。
-      - データは `backend/chroma_db/` ディレクトリに永続化される。
+ユーザーの質問に対する回答生成プロセスは、LangGraphを用いて状態機械としてモデル化します。
 
-#### 4.3.2. フェーズ2: 質問応答 (リアルタイム処理)
+1.  **`vector_retriever`**: ユーザーの質問をベクトル化し、**ChromaDB**にクエリを投げて、意味的に関連性の高い投稿（グラフ探索の開始点）を複数取得します。
+2.  **`graph_traverser`**: `vector_retriever`で見つかった投稿を開始点として、**RAG用PostgreSQL**にクエリを投げます。再帰的なSQLクエリを用いて、`IS_REPLY_TO`（意味的な返信）と`IS_SEQUENTIAL_TO`（構造的な後続レス）の両方の関係性を辿り、広範な会話コンテキストを収集します。
+3.  **`context_synthesizer`**: 収集したコンテキスト情報を統合し、LLMが理解しやすい形式に整形します。
+4.  **`response_generator`**: 整形されたコンテキストと元の質問を基に、LLMが最終的な回答を生成します。
 
-`rag/chain.py` に実装。
+このプロセス全体を通じて、**既存の掲示板データベースへのアクセスは一切発生しない**ため、リアルタイム性とスケーラビリティが保証されます。
 
-1.  **リトリーバー (`rag/retriever.py`)**:
-      - インデックス作成済みのベクトルストアと`docstore`から`ParentDocumentRetriever`を初期化して使用する。
-      - （高度化）`SelfQueryRetriever`のロジックを組み合わせ、`id`や期間でのフィルタリングを可能にする。
-2.  **プロンプトテンプレート**:
-      - 取得した文脈（親ドキュメント）と質問を効果的にLLMに渡すためのプロンプトを設計する。
-    <!-- end list -->
-    ```python
-    from langchain_core.prompts import ChatPromptTemplate
+---
 
-    template = """
-    あなたは賢い掲示板のアシスタントです。
-    提供された掲示板の過去ログの文脈を元に、ユーザーの質問に日本語で回答してください。
-    文脈に答えがない場合は、無理に答えを生成せず「分かりません」と回答してください。
+## 第5部：デプロイメントと運用
 
-    【文脈】
-    {context}
+DockerとDocker Composeを用いて、RAGシステム全体をコンテナ化してデプロイします。
 
-    【質問】
-    {question}
-    """
-    prompt = ChatPromptTemplate.from_template(template)
-    ```
-3.  **LLM**:
-      - `ChatOpenAI`など、ストリーミングに対応したモデルを利用する。
-4.  **ストリーミング応答**:
-      - FastAPIの`StreamingResponse`とLangChainの`AsyncIteratorCallbackHandler`を組み合わせる。LLMからの生成トークンを非同期イテレータ経由で受け取り、そのままSSEイベントとしてクライアントに送信する。
+### 5.1. Docker Compose構成
 
-### 4.4. 環境変数管理 (`.env`)
+`docker-compose.yml`は、新規RAGシステムのコンポーネントのみを定義します。
 
-```ini
-# PostgreSQL
-DATABASE_URL="postgresql://user:password@localhost:5432/bbs2"
+1.  **`rag-postgres`**: RAG用のPostgreSQLサービス。
+2.  **`chroma`**: ChromaDBサービス。
+3.  **`api`**: FastAPIバックエンドサービス。このサービスには、**2つのデータベース接続情報**（`RAG_DATABASE_URL`と`SOURCE_DATABASE_URL`）を環境変数として渡します。`SOURCE_DATABASE_URL`はデータ同期パイプラインが使用し、`RAG_DATABASE_URL`はリアルタイムAPIが使用します。
+4.  **`frontend`**: Reactアプリケーションを配信するNginxサービス。
+5.  **`sync-worker`**: データ同期パイプラインを定期実行するためのサービス。`api`サービスと同じDockerイメージを使い、同期スクリプトを実行するコマンドを指定します。
 
-# OpenAI
-OPENAI_API_KEY="sk-..."
+この構成により、既存システムとは完全に分離された、独立したRAG環境を簡単に構築・運用できます。
 
-# PGVector
-COLLECTION_NAME="bbs_rag_collection"
-```
+---
 
-## 5\. フロントエンド設計 (React + Vite)
+## 第6部：結論
 
-### 5.1. ディレクトリ構成
-
-```
-frontend/
-├── public/
-├── src/
-│   ├── api/                 # OpenAPI Generatorで生成されたクライアント
-│   ├── components/
-│   │   ├── ChatInterface.tsx
-│   │   ├── Message.tsx
-│   │   └── InputForm.tsx
-│   ├── App.tsx
-│   ├── main.tsx
-│   └── styles/
-├── index.html
-├── openapi-generator-config.json
-├── package.json
-└── tsconfig.json
-```
-
-### 5.2. APIクライアント
-
-  - バックエンドのFastAPIサーバーを起動し、`/openapi.json`にアクセスする。
-  - `openapi-generator-cli` を使用し、上記のJSONからTypeScriptのAPIクライアント (`src/api/`) を自動生成する。
-    ```bash
-    openapi-generator-cli generate -i http://localhost:8000/openapi.json -g typescript-fetch -o src/api
-    ```
-
-### 5.3. ストリーミングデータのハンドリング
-
-  - `fetch` APIを使用してバックエンドに`POST /api/v1/ask`リクエストを送信する。
-  - レスポンスの`body`は`ReadableStream`なので、`TextDecoder`を用いてチャンクをデコードし、リアルタイムでReactのstateに追記していくことで、タイプライターのような表示効果を実現する。
-
-<!-- end list -->
-
-```typescript
-// ChatInterface.tsx の一部
-const handleSend = async (question: string) => {
-  setMessages(prev => [...prev, { role: 'user', content: question }]);
-  const response = await fetch('/api/v1/ask', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ question }),
-  });
-
-  if (response.body) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let aiResponse = '';
-    
-    // AIアシスタントのメッセージを初期化
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      // SSEのデータ部分をパース
-      const lines = chunk.split('\n');
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.substring(6);
-          if (data) {
-            aiResponse += JSON.parse(data).token;
-            // 最後のメッセージを更新
-            setMessages(prev => {
-              const newMessages = [...prev];
-              newMessages[newMessages.length - 1].content = aiResponse;
-              return newMessages;
-            });
-          }
-        }
-      }
-    }
-  }
-};
-```
-
-## 6\. 開発・運用
-
-### 6.1. 開発環境構築
-
-  - `docker-compose.yml` を作成し、フロントエンド、バックエンド、PostgreSQL(PGVector含む)のコンテナを一括で起動できるようにする。
-  - これにより、開発者間の環境差異をなくし、セットアップを容易にする。
-
-### 6.2. インデックス更新戦略
-
-  - 新しいレスが投稿された際のインデックス更新は、以下のいずれかの戦略を取る。
-    1.  **定時バッチ処理:** 夜間などに`scripts/create_index.py`をcronジョブとして実行し、差分または全データを再インデックスする。
-    2.  **イベントドリブン:** (高度) データベースのトリガーなどを利用して、新規投稿をイベントとして検知し、インデックス更新用のマイクロサービスを呼び出す。
-  - 初期実装では、運用負荷の低い**定時バッチ処理**を推奨する。
+本設計書は、既存の掲示板データベースを一切変更することなく、そのデータを活用して高度な質問応答機能を実現するための、分離型GraphRAGシステムの実装計画を提示しました。データ同期パイプラインによって既存データからナレッジグラフを構築し、リアルタイムAPIはそのグラフのみを参照することで、システムの独立性、パフォーマンス、および安全性を確保します。

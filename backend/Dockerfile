@@ -1,31 +1,36 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
-    postgresql-client \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to PATH
+ENV PATH="/root/.local/bin:${PATH}"
+
+WORKDIR /app
 
 # Copy project files
-COPY pyproject.toml .
-COPY README.md .
-
-# Create and use virtual environment with uv
-RUN uv venv /app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
+COPY pyproject.toml ./
+COPY README.md ./
+COPY app ./app
+COPY scripts ./scripts
 
 # Install dependencies using uv
-RUN uv pip install -e .
+RUN uv venv && \
+    . .venv/bin/activate && \
+    uv pip install -e .
 
-# Copy application code
-COPY . .
-
+# Expose port
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Set environment to use the virtual environment
+ENV PATH="/app/.venv/bin:${PATH}"
+
+# Default command (can be overridden by docker-compose)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

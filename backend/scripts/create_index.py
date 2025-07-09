@@ -1,173 +1,133 @@
-#!/usr/bin/env python
-"""
-インデックス作成スクリプト
+#!/usr/bin/env python3
+"""Create vector index from bulletin board posts."""
 
-使用方法:
-    cd backend
-    uv run python scripts/create_index.py
-"""
 import asyncio
+import json
 import sys
-import time
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-from tqdm import tqdm
-
-# プロジェクトのルートディレクトリをPythonパスに追加
+# Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-
 from app.core.config import settings
-from app.core.database import SessionLocal
-from app.models.res import Res
-from app.rag.loader import PostgresResLoader, ThreadAwareLoader
-from app.rag.retriever import get_parent_document_retriever, get_vector_store
+from app.rag.loader import PostgresResLoader
+from app.rag.retriever import SlidingWindowChunker, create_retriever
 
 
-async def create_index() -> None:
-    """ベクトルインデックスを作成"""
-    print("Starting index creation process...")
+def load_index_metadata() -> dict[str, Any]:
+    """Load index metadata from file."""
+    metadata_path = Path("index_metadata.json")
+    if metadata_path.exists():
+        with open(metadata_path, "r") as f:
+            data: dict[str, Any] = json.load(f)
+            return data
+    return {"last_processed_no": 0, "last_updated": None}
 
-    # データベースのレコード数を確認
-    db = SessionLocal()
-    try:
-        res_count = db.query(Res).count()
-        print(f"Found {res_count} records in res table")
 
-        if res_count == 0:
-            print("No records found in res table. Please ensure data is loaded.")
-            return
-    finally:
-        db.close()
+def save_index_metadata(metadata: dict[str, Any]) -> None:
+    """Save index metadata to file."""
+    with open("index_metadata.json", "w") as f:
+        json.dump(metadata, f, indent=2)
 
-    # ローダーの初期化
-    print("Initializing document loaders...")
-    base_loader = PostgresResLoader(batch_size=100)
-    # スライディングウィンドウ: 50レスごと、20レス重複
-    parent_loader = ThreadAwareLoader(window_size=50, overlap=20)
 
-    # デバッグ: まず基本ローダーで数件読み込んでみる
-    print("Testing base loader...")
-    test_docs = list(base_loader.lazy_load())[:5]
-    if test_docs:
-        print(f"✓ Base loader working. Sample document: {test_docs[0].page_content[:100]}...")
+async def create_index(incremental: bool = False) -> None:
+    """Create or update the vector index.
+
+    Args:
+        incremental: If True, only process new posts since last update
+    """
+    print("🚀 Starting index creation...")
+
+    # Load metadata
+    metadata = load_index_metadata()
+    start_no = None
+
+    if incremental and metadata["last_processed_no"] > 0:
+        start_no = metadata["last_processed_no"] + 1
+        print(f"📊 Incremental update: Starting from post No.{start_no}")
     else:
-        print("✗ Base loader returned no documents")
+        print("📊 Full index creation")
+
+    # Initialize loader
+    loader = PostgresResLoader(start_no=start_no)
+
+    # Load documents
+    print("📖 Loading posts from database...")
+    documents = loader.load()
+
+    if not documents:
+        print("✅ No new posts to process")
         return
 
-    # ベクトルストアとretrieverの取得
-    print("Setting up vector store and retriever...")
-    vector_store = get_vector_store()
+    print(f"📄 Loaded {len(documents)} posts")
 
-    # 既存のインデックスをクリア（オプション）
-    print("Clearing existing index...")
-    try:
-        # Chromaコレクションをリセット
-        vector_store.delete_collection()
-        print("Existing index cleared")
-    except Exception as e:
-        print(f"No existing index to clear or error: {e}")
-
-    # ベクトルストアとretrieverを再作成
-    print("Creating new vector store and retriever...")
-    vector_store = get_vector_store()
-    retriever = get_parent_document_retriever(vector_store)
-
-    # 親ドキュメントと子ドキュメントの準備
-    print("\nLoading parent documents...")
-    parent_docs = []
-
-    # まずドキュメントを読み込み（プログレスバーなしで確認）
-    print("Loading documents (this may take a few minutes)...")
-    doc_count = 0
-    start_time = time.time()
-
-    for doc in parent_loader.lazy_load():
-        parent_docs.append(doc)
-        doc_count += 1
-
-        # 100件ごとに進捗を表示
-        if doc_count % 100 == 0:
-            elapsed = time.time() - start_time
-            rate = doc_count / elapsed
-            estimated_total = (res_count + 49) // 50
-            estimated_remaining = (estimated_total - doc_count) / rate if rate > 0 else 0
-            print(
-                f"  Loaded {doc_count} documents... " f"(~{estimated_remaining:.0f}s remaining)",
-                end="\r",
-            )
-
-    print(f"\n✓ Created {len(parent_docs)} parent documents")
-
-    # ドキュメントをretrieverに追加
-    print("\nAdding documents to vector store...")
-    if parent_docs:
-        # バッチ処理で追加
-        batch_size = 10  # 元のバッチサイズに戻す
-        # total_batches = (len(parent_docs) + batch_size - 1) // batch_size
-
-        with tqdm(total=len(parent_docs), desc="Indexing documents", unit="docs") as pbar:
-            for i in range(0, len(parent_docs), batch_size):
-                batch = parent_docs[i : i + batch_size]
-
-                try:
-                    retriever.add_documents(batch)
-                    pbar.update(len(batch))
-
-                    # 進捗率を表示
-                    progress = (i + batch_size) / len(parent_docs) * 100
-                    pbar.set_postfix({"progress": f"{min(progress, 100):.1f}%"})
-
-                except Exception as e:
-                    print(f"\n⚠️  Error at batch {i//batch_size + 1}: {e}")
-                    print(f"Error details: {type(e).__name__}: {e}")
-                    print(f"Skipping batch {i//batch_size + 1}")
-                    continue
-
-    print("Index creation completed successfully!")
-
-    # インデックスの統計情報を表示
-    print("\nIndex Statistics:")
-    print(f"- Total parent documents: {len(parent_docs)}")
-    if parent_docs:
-        total_res = sum(doc.metadata.get("res_count", 0) for doc in parent_docs)
-        print(f"- Total res covered: {total_res}")
-        print(f"- Average res per parent document: {total_res / len(parent_docs):.1f}")
-
-
-def main() -> None:
-    """メイン関数"""
-    # 環境変数の確認
-    if not settings.OPENAI_API_KEY:
-        print("Error: OPENAI_API_KEY is not set in environment variables")
-        sys.exit(1)
-
-    if not settings.DATABASE_URL:
-        print("Error: DATABASE_URL is not set in environment variables")
-        sys.exit(1)
-
-    print("=== BBS RAG Index Creation ===")
-    db_url = (
-        settings.DATABASE_URL.split("@")[1]
-        if "@" in settings.DATABASE_URL
-        else settings.DATABASE_URL
+    # Create sliding windows
+    print("🪟 Creating sliding windows...")
+    chunker = SlidingWindowChunker(
+        window_size=settings.window_size,
+        overlap=settings.window_overlap,
     )
-    print(f"Database: {db_url}")
-    print(f"Collection: {settings.COLLECTION_NAME}")
-    print(f"LLM Model: {settings.OPENAI_MODEL}")
-    print(f"Embedding Model: {settings.OPENAI_EMBEDDING_MODEL}")
-    print("==============================\n")
+    windows = chunker.create_windows(documents)
+    print(f"📦 Created {len(windows)} windows")
 
-    # 開始時間を記録
-    start_time = time.time()
+    # Initialize retriever
+    print("🔧 Initializing retriever...")
+    retriever = create_retriever()
 
-    # インデックス作成の実行
-    asyncio.run(create_index())
+    # Add documents to index
+    print("💾 Adding documents to vector store...")
 
-    # 実行時間を表示
-    elapsed_time = time.time() - start_time
-    print(f"\n✓ Total execution time: {elapsed_time:.1f} seconds ({elapsed_time/60:.1f} minutes)")
+    # Add documents in batches to show progress
+    batch_size = 10
+    for i in range(0, len(windows), batch_size):
+        batch = windows[i : i + batch_size]
+        try:
+            # Use the vectorstore directly for adding parent documents
+            retriever.vectorstore.add_documents(batch)
+            progress = min(i + batch_size, len(windows))
+            print(f"   Progress: {progress}/{len(windows)} windows indexed")
+        except Exception as e:
+            print(f"Error adding batch {i//batch_size + 1}: {e}")
+            # Try alternative approach
+            for doc in batch:
+                retriever.vectorstore.add_documents([doc])
+
+    # Update metadata
+    if documents:
+        last_no = max(doc.metadata["no"] for doc in documents)
+        metadata["last_processed_no"] = last_no
+        metadata["last_updated"] = datetime.now().isoformat()
+        save_index_metadata(metadata)
+        print(f"📝 Updated metadata: last processed No.{last_no}")
+
+    print("✅ Index creation completed successfully!")
+
+
+async def main() -> None:
+    """Main entry point."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Create vector index for BBS RAG")
+    parser.add_argument(
+        "--incremental",
+        "-i",
+        action="store_true",
+        help="Perform incremental update instead of full rebuild",
+    )
+
+    args = parser.parse_args()
+
+    try:
+        await create_index(incremental=args.incremental)
+    except KeyboardInterrupt:
+        print("\n⚠️  Process interrupted by user")
+        sys.exit(1)
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

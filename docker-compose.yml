@@ -1,16 +1,17 @@
 services:
-  postgres:
+  # RAG Database (GraphRAG用)
+  postgres-rag:
     image: postgres:16
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: bbs2
+      POSTGRES_USER: raguser
+      POSTGRES_PASSWORD: ragpassword
+      POSTGRES_DB: bbs_rag
     ports:
-      - "5432:5432"
+      - "5433:5432"  # 5433番ポートでホストに公開
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_rag_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d bbs2"]
+      test: ["CMD-SHELL", "pg_isready -U raguser -d bbs_rag"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -18,18 +19,30 @@ services:
   backend:
     build: ./backend
     environment:
-      DATABASE_URL: postgresql://user:password@postgres:5432/bbs2
+      # Source DB (外部の読み取り専用)
+      DATABASE_URL: ${DATABASE_URL}
+      # RAG DB (ローカルのGraphRAG用)
+      RAG_DATABASE_URL: postgresql://raguser:ragpassword@postgres-rag:5432/bbs_rag
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      COLLECTION_NAME: bbs_rag_collection
+      COLLECTION_NAME: ${COLLECTION_NAME}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      BACKEND_HOST: ${BACKEND_HOST:-0.0.0.0}
+      BACKEND_PORT: ${BACKEND_PORT:-8000}
+      # Chroma settings  
+      CHROMA_PERSIST_DIRECTORY: /app/chroma_db
+      # Model settings
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      CHAT_MODEL: ${CHAT_MODEL:-gpt-4o}
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
+      postgres-rag:
         condition: service_healthy
-    # volumes:
-    #   - ./backend:/app
-    #   - /app/.venv  # Exclude venv from volume mount
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./backend:/app
+      - /app/.venv  # Exclude venv from volume mount
+      - ./backend/chroma_db:/app/chroma_db  # Persist Chroma DB
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --log-level debug
 
   frontend:
     build: ./frontend
@@ -41,4 +54,4 @@ services:
     command: npm run dev -- --host
 
 volumes:
-  postgres_data:
+  postgres_rag_data:

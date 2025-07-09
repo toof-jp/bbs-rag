@@ -1,37 +1,35 @@
 [project]
-name = "bbs-rag"
+name = "bbs-rag-backend"
 version = "0.1.0"
-description = "BBS RAG Application Backend"
+description = "BBS RAG Backend with FastAPI and LangChain"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.109.0",
-    "uvicorn[standard]>=0.27.0",
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+    "langchain>=0.2.0",
+    "langchain-community>=0.2.0",
+    "langchain-openai>=0.1.0",
+    "langchain-chroma>=0.1.0",
+    "langgraph>=0.2.0",
+    "chromadb>=0.5.0",
+    "psycopg2-binary>=2.9.0",
+    "sqlalchemy>=2.0.0",
     "python-dotenv>=1.0.0",
-    "pydantic>=2.5.3",
-    "pydantic-settings>=2.1.0",
-    "langchain>=0.1.0",
-    "langchain-community>=0.1.0",
-    "langchain-openai>=0.0.2",
-    "openai>=1.7.1",
-    "psycopg2-binary>=2.9.9",
-    "sqlalchemy>=2.0.25",
-    "asyncpg>=0.29.0",
-    "httpx>=0.26.0",
-    "sse-starlette>=1.8.2",
-    "chromadb>=0.4.0",
-    "tqdm>=4.65.0",
+    "sse-starlette>=2.0.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=7.4.3",
-    "pytest-asyncio>=0.21.1",
-    "black>=23.11.0",
-    "ruff>=0.1.6",
-    "mypy>=1.7.1",
-    "ipython>=8.18.1",
-    "httpx>=0.26.0",
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "black==25.1.0",
+    "mypy>=1.10.0",
+    "types-psycopg2",
+    "types-sqlalchemy",
 ]
 
 [build-system]
@@ -43,27 +41,12 @@ packages = ["app"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
-
-[tool.ruff.lint]
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-]
-ignore = []
+select = ["E", "F", "I"]
 
 [tool.black]
 line-length = 100
-target-version = ["py311"]
 
 [tool.mypy]
 python_version = "3.11"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = true
+strict = true
 ignore_missing_imports = true
